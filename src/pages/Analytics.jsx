@@ -65,7 +65,7 @@ const Analytics = () => {
                         <h4 style={{ fontWeight: '700' }}>Presence by Branch</h4>
                     </div>
                     <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
-                        {data?.presence.map((branch, i) => (
+                        {(Array.isArray(data?.presence) ? data.presence : []).map((branch, i) => (
                             <div key={i} style={{ padding: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                     <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{branch.BranchName}</span>
@@ -93,7 +93,7 @@ const Analytics = () => {
                         <h4 style={{ fontWeight: '700' }}>High-Performance Burnout Risk</h4>
                     </div>
                     <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
-                        {data?.burnout.map((emp, i) => (
+                        {(Array.isArray(data?.burnout) ? data.burnout : []).map((emp, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '12px', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                                 <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Target size={20} color="var(--error)" />
@@ -130,7 +130,7 @@ const Analytics = () => {
                                     dataKey="PunctualityRate"
                                     nameKey="DepartmentName"
                                 >
-                                    {data?.leaderboard.map((entry, index) => (
+                                    {(Array.isArray(data?.leaderboard) ? data.leaderboard : []).map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
@@ -139,7 +139,7 @@ const Analytics = () => {
                          </ResponsiveContainer>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '1rem' }}>
-                        {data?.leaderboard.slice(0, 4).map((dept, i) => (
+                        {(Array.isArray(data?.leaderboard) ? data.leaderboard.slice(0, 4) : []).map((dept, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem' }}>
                                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[i % COLORS.length] }}></div>
                                 <span style={{ color: 'var(--text-dim)' }}>{dept.DepartmentName}</span>

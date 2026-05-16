@@ -236,7 +236,7 @@ const Payroll = () => {
             </div>
 
             {/* Content */}
-            <div className="card glass" style={{ flex: 1 }}>
+            <div className="card glass" style={{ flex: 1, minHeight: '400px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {activeTab === 'history' && (
                     <DataTable
                         headers={['Employee', 'Period', 'Gross', 'Tax', 'Net Salary', 'Status']}

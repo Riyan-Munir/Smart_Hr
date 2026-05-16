@@ -423,7 +423,7 @@ const Recruitment = () => {
 
             {activeView === 'interviews' ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {interviews.length === 0 ? (
+                    {interviews.length === 0 || !Array.isArray(interviews) ? (
                         <div className="card glass" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>No interviews scheduled yet.</div>
                     ) : interviews.map(iv => (
                         <div key={iv.InterviewID} className="card glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem' }}>
@@ -479,7 +479,7 @@ const Recruitment = () => {
                                 {loading ? (
                                     <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)' }}>Loading...</div>
                                 ) : (
-                                    applicants
+                                    (Array.isArray(applicants) ? applicants : [])
                                         .filter(a => a.Status === col.status)
                                         .map(a => <ApplicantCard key={a.ApplicantID} applicant={a} onHire={setSelectedApplicant} onReject={handleReject}
                                             onSchedule={() => { setInterviewTarget(a); setInterviewForm({ interviewDate: '', feedback: '' }); setShowInterviewModal(true); }} />)

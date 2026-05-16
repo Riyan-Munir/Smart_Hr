@@ -200,11 +200,11 @@ const Attendance = () => {
                 </div>
             </div>
 
-            <div className="card glass" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
+            <div className="card glass" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
                     <h4 style={{ fontWeight: '700' }}>Daily Activity Log</h4>
                 </div>
-                <div style={{ flex: 1, padding: '0 12px' }}>
+                <div style={{ flex: 1, padding: '0 12px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <DataTable headers={headers} data={attendance} renderRow={renderRow} loading={loading} />
                 </div>
             </div>

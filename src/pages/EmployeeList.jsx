@@ -120,7 +120,8 @@ const EmployeeList = () => {
         fetchEmployees();
     }, []);
 
-    const filteredEmployees = employees.filter(e => 
+    const safeEmployees = Array.isArray(employees) ? employees : [];
+    const filteredEmployees = safeEmployees.filter(e => 
         `${e.FirstName} ${e.LastName}`.toLowerCase().includes(search.toLowerCase()) ||
         e.EmployeeCode.toLowerCase().includes(search.toLowerCase())
     );
@@ -215,12 +216,14 @@ const EmployeeList = () => {
                 </button>
             </div>
 
-            <DataTable 
-                headers={headers} 
-                data={filteredEmployees} 
-                renderRow={renderRow} 
-                loading={loading} 
-            />
+            <div className="card glass" style={{ flex: 1, minHeight: '400px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <DataTable 
+                    headers={headers} 
+                    data={filteredEmployees} 
+                    renderRow={renderRow} 
+                    loading={loading} 
+                />
+            </div>
 
             {showModal && (
                 <div className="modal-overlay">
