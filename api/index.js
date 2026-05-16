@@ -94,6 +94,27 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+app.get('/api/db-test', async (req, res) => {
+    try {
+        console.log('🔍 Testing DB connection...');
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT GETDATE() as serverTime');
+        res.json({ 
+            status: 'success', 
+            message: 'Successfully connected to Azure SQL',
+            serverTime: result.recordset[0].serverTime
+        });
+    } catch (err) {
+        console.error('❌ DB Test Failed:', err.message);
+        res.status(500).json({ 
+            status: 'error', 
+            message: 'Database connection failed', 
+            details: err.message,
+            tip: 'Ensure Azure SQL Firewall allows "Azure Services" or 0.0.0.0/0.'
+        });
+    }
+});
+
 // --- API ROUTES ---
 
 // Auth
