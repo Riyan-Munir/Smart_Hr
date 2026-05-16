@@ -12,9 +12,9 @@ const HireModal = ({ applicant, onClose, onHired }) => {
         username: applicant.Email.split('@')[0],
         password: 'ChangeMe123!',
         roleID: applicant.DesiredRoleID || '',
-        gender: 'Male',
-        dob: '1990-01-01',
-        cnic: ''
+        gender: applicant.Gender || 'Male',
+        dob: applicant.DOB ? applicant.DOB.split('T')[0] : '1990-01-01',
+        cnic: applicant.CNIC || ''
     });
     const [lookups, setLookups] = useState({ departments: [], designations: [], branches: [], roles: [] });
     const [errors, setErrors] = useState({
@@ -79,7 +79,7 @@ const HireModal = ({ applicant, onClose, onHired }) => {
                     lastName: applicant.LastName, 
                     phone: applicant.Phone, 
                     email: applicant.Email, 
-                    address: 'Pending' 
+                    address: applicant.Address || 'N/A' 
                 })
             });
             if (res.ok) {
