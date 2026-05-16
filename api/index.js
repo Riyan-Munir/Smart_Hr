@@ -1,7 +1,7 @@
 const express = require('express');
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const sql = require('mssql');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
@@ -53,7 +53,7 @@ const poolPromise = (async () => {
         // Validate Environment Variables
         const requiredVars = ['DB_USER', 'DB_PASSWORD', 'DB_SERVER', 'DB_NAME', 'JWT_SECRET'];
         const missingVars = requiredVars.filter(v => !process.env[v]);
-        
+
         if (missingVars.length > 0) {
             throw new Error(`Missing required environment variables: ${missingVars.join(', ')}. Please set them in Vercel settings.`);
         }
@@ -83,8 +83,8 @@ const authenticateToken = (req, res, next) => {
 
 // --- HEALTH CHECK ---
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'ok', 
+    res.json({
+        status: 'ok',
         message: 'SmartHR+ API is running',
         timestamp: new Date().toISOString(),
         env: {
@@ -99,16 +99,16 @@ app.get('/api/db-test', async (req, res) => {
         console.log('🔍 Testing DB connection...');
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT GETDATE() as serverTime');
-        res.json({ 
-            status: 'success', 
+        res.json({
+            status: 'success',
             message: 'Successfully connected to Azure SQL',
             serverTime: result.recordset[0].serverTime
         });
     } catch (err) {
         console.error('❌ DB Test Failed:', err.message);
-        res.status(500).json({ 
-            status: 'error', 
-            message: 'Database connection failed', 
+        res.status(500).json({
+            status: 'error',
+            message: 'Database connection failed',
             details: err.message,
             tip: 'Ensure Azure SQL Firewall allows "Azure Services" or 0.0.0.0/0.'
         });
@@ -131,33 +131,41 @@ app.post('/api/auth/login', async (req, res) => {
                 JOIN Employees e ON u.EmployeeID = e.EmployeeID
                 WHERE u.Username = @username
             `);
-        if (result.recordset.length === 0 || password !== result.recordset[0].PasswordHash) {
+        const user = result.recordset[0];
+        
+        // Secure Password Check
+        const isPasswordValid = await bcrypt.compare(password, user.PasswordHash);
+        
+        // FALLBACK: Allow plaintext comparison for existing users during migration period
+        // Remove the '|| password === user.PasswordHash' once all users are migrated
+        if (!isPasswordValid && password !== user.PasswordHash) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
-        const user = result.recordset[0];
+
         const token = jwt.sign(
             { id: user.UserID, role: user.RoleName, employeeId: user.EmployeeID, name: `${user.FirstName} ${user.LastName}` },
             process.env.JWT_SECRET,
             { expiresIn: '8h' }
         );
         res.json({ token, user: { name: `${user.FirstName} ${user.LastName}`, role: user.RoleName } });
-    } catch (err) { 
+    } catch (err) {
         console.error('❌ Login Error:', err.message);
-        res.status(500).json({ 
-            message: 'Database connection or query error', 
+        res.status(500).json({
+            message: 'Database connection or query error',
             details: err.message,
-            tip: 'Check Vercel Env Vars and Azure SQL Firewall (Allow Azure Services).' 
-        }); 
+            tip: 'Check Vercel Env Vars and Azure SQL Firewall (Allow Azure Services).'
+        });
     }
 });
 
 // Lookups (Protected)
+// These routes are now handled by the /api/lookups endpoints for better organization
 app.get('/api/roles', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT * FROM Roles');
         res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch roles' }); }
 });
 
 app.get('/api/departments', authenticateToken, async (req, res) => {
@@ -165,7 +173,7 @@ app.get('/api/departments', authenticateToken, async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT * FROM Departments');
         res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch departments' }); }
 });
 
 app.get('/api/designations', authenticateToken, async (req, res) => {
@@ -173,7 +181,7 @@ app.get('/api/designations', authenticateToken, async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT * FROM Designations');
         res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch designations' }); }
 });
 
 app.get('/api/branches', authenticateToken, async (req, res) => {
@@ -181,7 +189,7 @@ app.get('/api/branches', authenticateToken, async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT * FROM Branches');
         res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch branches' }); }
 });
 
 // Recruitment: Hire (Complex Enrollment)
@@ -190,6 +198,7 @@ app.post('/api/recruitment/hire', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
         // 1. Enrollment via Stored Procedure
+        const hashedPassword = await bcrypt.hash(e.password, 10);
         await pool.request()
             .input('EmployeeCode', sql.NVarChar, e.employeeCode)
             .input('FirstName', sql.NVarChar, e.firstName)
@@ -205,7 +214,7 @@ app.post('/api/recruitment/hire', authenticateToken, async (req, res) => {
             .input('BranchID', sql.Int, e.branchID)
             .input('BasicSalary', sql.Decimal, e.basicSalary)
             .input('Username', sql.NVarChar, e.username)
-            .input('PasswordHash', sql.NVarChar, e.password) // In production hash it
+            .input('PasswordHash', sql.NVarChar, hashedPassword) 
             .input('RoleID', sql.Int, e.roleID)
             .execute('sp_AddEmployee');
 
@@ -243,16 +252,16 @@ app.post('/api/recruitment/hire', authenticateToken, async (req, res) => {
             res.json({ message: 'Employee hired and welcome email sent successfully!', info: info.response });
         } catch (mailErr) {
             console.error('⚠️ SQL Success but Email Failed:', mailErr);
-            res.json({ 
-                message: 'Employee enrolled in DB, but email notification failed.', 
+            res.json({
+                message: 'Employee enrolled in DB, but email notification failed.',
                 error: mailErr.message,
                 tip: 'Check SMTP credentials or App Password.'
             });
         }
-    } catch (err) { 
+    } catch (err) {
         console.error('❌ Hiring Process Error:', err);
         let userMessage = 'An unexpected error occurred during enrollment.';
-        
+
         // Handle SQL Constraint Violations (Duplicate Keys, etc.)
         if (err.number === 2627 || err.number === 2601 || err.message.includes('Violation of UNIQUE KEY')) {
             if (err.message.includes('Email')) userMessage = 'This Email is already registered to an active employee.';
@@ -264,7 +273,7 @@ app.post('/api/recruitment/hire', authenticateToken, async (req, res) => {
         } else {
             userMessage = err.message;
         }
-        res.status(400).json({ message: userMessage }); 
+        res.status(400).json({ message: userMessage });
     }
 });
 
@@ -275,7 +284,7 @@ app.post('/api/recruitment/reject/:id', authenticateToken, async (req, res) => {
         const applicant = await pool.request()
             .input('ID', sql.Int, req.params.id)
             .query('SELECT Email, FirstName FROM Applicants WHERE ApplicantID = @ID');
-        
+
         if (applicant.recordset.length > 0) {
             const { Email, FirstName } = applicant.recordset[0];
             await pool.request()
@@ -288,7 +297,7 @@ app.post('/api/recruitment/reject/:id', authenticateToken, async (req, res) => {
                 subject: 'Update regarding your application at SmartHR+',
                 text: `Dear ${FirstName},\n\nThank you for your interest in SmartHR+. After careful consideration, we have decided not to move forward with your application at this time.\n\nWe wish you the best in your future endeavors.`
             };
-            
+
             console.log(`📧 Sending rejection email to: ${Email}...`);
             try {
                 await transporter.sendMail(mailOptions);
@@ -298,9 +307,9 @@ app.post('/api/recruitment/reject/:id', authenticateToken, async (req, res) => {
             }
         }
         res.json({ message: 'Applicant processed and notified' });
-    } catch (err) { 
+    } catch (err) {
         console.error('❌ Rejection Error:', err);
-        res.status(500).json({ message: err.message }); 
+        res.status(500).json({ message: err.message });
     }
 });
 
@@ -326,12 +335,12 @@ app.post('/api/public/apply', async (req, res) => {
                 VALUES (@FirstName, @LastName, @Email, @Phone, @Gender, @DOB, @CNIC, @Address, @Position, @Proposal, @RoleID, 'Applied')
             `);
         res.json({ message: 'Application submitted successfully' });
-    } catch (err) { 
+    } catch (err) {
         let userMessage = err.message;
         if (err.number === 2627 || err.number === 2601) {
             userMessage = 'You have already submitted an application with this email address.';
         }
-        res.status(400).json({ message: userMessage }); 
+        res.status(400).json({ message: userMessage });
     }
 });
 
@@ -340,126 +349,36 @@ app.get('/api/public/roles', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT RoleID, RoleName FROM Roles');
         res.json(result.recordset);
-    } catch (err) { 
+    } catch (err) {
         console.error('❌ Public Roles Error:', err.message);
-        res.status(500).json({ 
-            message: 'Failed to fetch roles', 
-            details: err.message 
-        }); 
+        res.status(500).json({
+            message: 'Failed to fetch roles',
+            details: err.message
+        });
     }
 });
 
 // Stats, Attendance, Payroll... 
+// --- DASHBOARD & ANALYTICS ---
+// Combined Stats for Admin and General Dashboard
 app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
         const stats = await pool.request().query(`
             SELECT 
                 (SELECT COUNT(*) FROM Employees WHERE EmploymentStatus = 'Active') as ActiveEmployees,
-                (SELECT COUNT(*) FROM LeaveRequests WHERE Status = 'Pending') as PendingLeaves,
-                (SELECT ISNULL(SUM(NetSalary), 0) FROM Payroll WHERE PayrollMonth = MONTH(GETDATE()) AND PayrollYear = YEAR(GETDATE())) as MonthlyPayout,
-                (SELECT COUNT(*) FROM Applicants WHERE Status = 'Applied') as NewApplicants
-        `);
-        res.json(stats.recordset[0]);
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-app.get('/api/applicants', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request().query('SELECT * FROM Applicants ORDER BY CreatedAt DESC');
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-// Employees: List
-app.get('/api/employees', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request().query(`
-            SELECT e.*, d.DepartmentName, des.DesignationName, b.BranchName
-            FROM Employees e
-            JOIN Departments d ON e.DepartmentID = d.DepartmentID
-            JOIN Designations des ON e.DesignationID = des.DesignationID
-            JOIN Branches b ON e.BranchID = b.BranchID
-            ORDER BY e.CreatedAt DESC
-        `);
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-// Payroll: Generate
-app.post('/api/payroll/generate', authenticateToken, async (req, res) => {
-    const { month, year } = req.body;
-    try {
-        const pool = await poolPromise;
-        await pool.request()
-            .input('Month', sql.Int, month)
-            .input('Year', sql.Int, year)
-            .execute('sp_GenerateMonthlyPayroll');
-        res.json({ message: 'Payroll generated successfully' });
-    } catch (err) { res.status(400).json({ message: err.message }); }
-});
-
-// Attendance: Mark
-app.post('/api/attendance/mark', authenticateToken, async (req, res) => {
-    const { checkInTime } = req.body;
-    try {
-        const pool = await poolPromise;
-        
-        // Handle time conversion for mssql sql.Time type
-        let timeValue = new Date(); // Default to now
-        if (checkInTime) {
-            const [hours, minutes, seconds] = checkInTime.split(':');
-            timeValue = new Date(1970, 0, 1, hours, minutes, seconds || 0);
-        }
-
-        await pool.request()
-            .input('EmployeeID', sql.Int, req.user.employeeId)
-            .input('CheckIn', sql.DateTime, new Date())
-            .execute('sp_MarkAttendance');
-            
-        res.json({ message: 'Attendance marked successfully' });
-    } catch (err) { 
-        console.error('❌ Attendance Error:', err);
-        res.status(400).json({ message: err.message }); 
-    }
-});
-
-// Attendance: History
-app.get('/api/attendance/history', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request()
-            .input('EmpID', sql.Int, req.user.employeeId)
-            .query(`
-                SELECT 
-                    FORMAT(AttendanceDate, 'yyyy-MM-dd') as Date,
-                    ISNULL(FORMAT(CheckInTime, 'hh:mm tt'), 'NOT RECORDED') as CheckIn,
-                    ISNULL(FORMAT(CheckOutTime, 'hh:mm tt'), 'NOT RECORDED') as CheckOut,
-                    Status,
-                    ISNULL(CAST(WorkingHours AS VARCHAR), '0.0') as Hours
-                FROM Attendance 
-                WHERE EmployeeID = @EmpID
-                ORDER BY AttendanceDate DESC
-            `);
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-// Dashboard: High-Level Stats
-app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const stats = await pool.request().query(`
-            SELECT 
                 (SELECT COUNT(*) FROM Employees) as TotalEmployees,
                 (SELECT COUNT(*) FROM LeaveRequests WHERE Status = 'Pending') as PendingLeaves,
+                (SELECT ISNULL(SUM(NetSalary), 0) FROM Payroll WHERE PayrollMonth = MONTH(GETDATE()) AND PayrollYear = YEAR(GETDATE())) as MonthlyPayout,
                 (SELECT ISNULL(SUM(NetSalary), 0) FROM Payroll WHERE MONTH(GeneratedDate) = MONTH(GETDATE())) as MonthlyPayroll,
+                (SELECT COUNT(*) FROM Applicants WHERE Status = 'Applied') as NewApplicants,
                 (SELECT ISNULL(AVG(ProductivityScore), 0) FROM vw_ProductivityScore) as AvgProductivity
         `);
         res.json(stats.recordset[0]);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { 
+        console.error('❌ Stats Error:', err.message);
+        res.status(500).json({ message: 'Failed to fetch dashboard statistics' }); 
+    }
 });
 
 // Analytics: Productivity
@@ -472,6 +391,7 @@ app.get('/api/analytics/productivity', authenticateToken, async (req, res) => {
 });
 
 // Analytics: Risks (Burnout & Attrition)
+// Analytics: Predictive Risks (Burnout & Attrition)
 app.get('/api/analytics/risks', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -495,85 +415,10 @@ app.get('/api/analytics/risks', authenticateToken, async (req, res) => {
             GROUP BY e.EmployeeID, e.FirstName, e.LastName
         `);
         res.json(risks.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-// Analytics: Personal Performance (Last 7 Days)
-app.get('/api/analytics/personal-hours', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request()
-            .input('EmpID', sql.Int, req.user.employeeId)
-            .query(`
-                SELECT FORMAT(AttendanceDate, 'ddd') as Day, 
-                       ISNULL(WorkingHours, 0) as Hours
-                FROM Attendance 
-                WHERE EmployeeID = @EmpID AND AttendanceDate > DATEADD(day, -7, GETDATE())
-                ORDER BY AttendanceDate ASC
-            `);
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-// Analytics: Workforce Distribution (By Department)
-app.get('/api/analytics/workforce', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request().query(`
-            SELECT d.DepartmentName as name, COUNT(e.EmployeeID) as value
-            FROM Departments d
-            LEFT JOIN Employees e ON d.DepartmentID = e.DepartmentID
-            GROUP BY d.DepartmentName
-            HAVING COUNT(e.EmployeeID) > 0
-        `);
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-// Dashboard: Employee Specific Summary
-app.get('/api/dashboard/employee-summary', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const summary = await pool.request()
-            .input('EmpID', sql.Int, req.user.employeeId)
-            .query(`
-                SELECT 
-                    (SELECT dbo.fn_GetLeaveBalance(@EmpID, 1)) as RemainingLeaves,
-                    (SELECT TOP 1 Status FROM Attendance WHERE EmployeeID = @EmpID AND AttendanceDate = CAST(GETDATE() AS DATE)) as TodayStatus,
-                    (SELECT ISNULL(SUM(Points), 0) FROM EmployeeRewardPoints WHERE EmployeeID = @EmpID) as RewardPoints,
-                    (SELECT TOP 1 CAST(ReviewDate AS DATE) FROM PerformanceReviews WHERE EmployeeID = @EmpID ORDER BY ReviewDate DESC) as LastReview
-            `);
-        res.json(summary.recordset[0]);
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-// Payroll: History
-app.get('/api/payroll/history', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request().query(`
-            SELECT p.*, e.FirstName + ' ' + e.LastName as EmployeeName, e.EmployeeCode
-            FROM Payroll p
-            JOIN Employees e ON p.EmployeeID = e.EmployeeID
-            ORDER BY p.GeneratedDate DESC
-        `);
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-// Analytics: Risks
-app.get('/api/analytics/risks', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request().query(`
-            SELECT TOP 5 e.FirstName + ' ' + e.LastName as Name, r.BurnoutStatus as Risk, 'Burnout' as Category
-            FROM vw_BurnoutRisk r JOIN Employees e ON r.EmployeeID = e.EmployeeID
-            UNION
-            SELECT TOP 5 e.FirstName + ' ' + e.LastName as Name, r.AttritionRiskLevel as Risk, 'Attrition' as Category
-            FROM vw_AttritionRisk r JOIN Employees e ON r.EmployeeID = e.EmployeeID
-        `);
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { 
+        console.error('❌ Risks Error:', err.message);
+        res.status(500).json({ message: 'Failed to calculate workforce risks' }); 
+    }
 });
 
 // Dashboard: Announcements
@@ -586,19 +431,23 @@ app.get('/api/dashboard/announcements', authenticateToken, async (req, res) => {
 });
 
 // Analytics: Personal Hours
+// Analytics: Personal Performance (Last 7 Days)
 app.get('/api/analytics/personal-hours', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request()
             .input('EmpID', sql.Int, req.user.employeeId)
             .query(`
-                SELECT TOP 7 FORMAT(AttendanceDate, 'ddd') as Day, WorkingHours as Hours
+                SELECT TOP 7 FORMAT(AttendanceDate, 'ddd') as Day, ISNULL(WorkingHours, 0) as Hours
                 FROM Attendance 
                 WHERE EmployeeID = @EmpID 
                 ORDER BY AttendanceDate DESC
             `);
         res.json(result.recordset.reverse());
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { 
+        console.error('❌ Personal Hours Error:', err.message);
+        res.status(500).json({ message: 'Failed to fetch personal performance data' }); 
+    }
 });
 
 // Profile: Get Details
@@ -639,11 +488,12 @@ app.post('/api/profile/update', authenticateToken, async (req, res) => {
                     Address = @Address, Gender = @Gender, DOB = @DOB, CNIC = @CNIC 
                 WHERE EmployeeID = @EmpID
             `);
-        
+
         if (Password) {
+            const hashedPass = await bcrypt.hash(Password, 10);
             await pool.request()
                 .input('EmpID', sql.Int, req.user.employeeId)
-                .input('Pass', sql.NVarChar, Password)
+                .input('Pass', sql.NVarChar, hashedPass)
                 .query('UPDATE Users SET PasswordHash = @Pass WHERE EmployeeID = @EmpID');
         }
         res.json({ message: 'Profile updated successfully' });
@@ -708,6 +558,7 @@ app.post('/api/broadcast', authenticateToken, async (req, res) => {
 });
 
 // Analytics: Workforce Distribution
+// Analytics: Workforce Distribution (By Department)
 app.get('/api/analytics/workforce', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -716,9 +567,13 @@ app.get('/api/analytics/workforce', authenticateToken, async (req, res) => {
             FROM Departments d
             LEFT JOIN Employees e ON d.DepartmentID = e.DepartmentID
             GROUP BY d.DepartmentName
+            HAVING COUNT(e.EmployeeID) > 0
         `);
         res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { 
+        console.error('❌ Workforce Analytics Error:', err.message);
+        res.status(500).json({ message: 'Failed to calculate workforce distribution' }); 
+    }
 });
 
 // --- LEAVE MANAGEMENT ---
@@ -806,7 +661,7 @@ app.post('/api/leaves/respond/:id', authenticateToken, async (req, res) => {
             .input('ID', sql.Int, req.params.id)
             .input('Status', sql.NVarChar, status)
             .query('UPDATE LeaveRequests SET Status = @Status WHERE LeaveRequestID = @ID');
-        
+
         // If approved, add a notification for the employee
         if (status === 'Approved' || status === 'Rejected') {
             const leaveRes = await pool.request().input('ID', sql.Int, req.params.id).query('SELECT EmployeeID FROM LeaveRequests WHERE LeaveRequestID = @ID');
@@ -838,7 +693,7 @@ app.post('/api/performance/review', authenticateToken, async (req, res) => {
                 INSERT INTO PerformanceReviews (EmployeeID, ReviewerID, Score, Comments)
                 VALUES (@EmpID, @ReviewerID, @Score, @Comments)
             `);
-        
+
         // Notify employee
         await pool.request()
             .input('EmpID', sql.Int, employeeID)
@@ -863,7 +718,7 @@ app.post('/api/performance/reward', authenticateToken, async (req, res) => {
                 INSERT INTO EmployeeRewardPoints (EmployeeID, Points, Reason)
                 VALUES (@EmpID, @Points, @Reason)
             `);
-        
+
         // Notify employee
         await pool.request()
             .input('EmpID', sql.Int, employeeID)
@@ -906,8 +761,8 @@ app.delete('/api/lookups/branches/:id', authenticateToken, async (req, res) => {
             .input('ID', sql.Int, req.params.id)
             .query('DELETE FROM Branches WHERE BranchID = @ID');
         res.json({ message: 'Branch deleted successfully' });
-    } catch (err) { 
-        res.status(400).json({ message: 'Cannot delete branch. It may be linked to existing employees or other records.' }); 
+    } catch (err) {
+        res.status(400).json({ message: 'Cannot delete branch. It may be linked to existing employees or other records.' });
     }
 });
 
@@ -938,8 +793,8 @@ app.delete('/api/lookups/departments/:id', authenticateToken, async (req, res) =
             .input('ID', sql.Int, req.params.id)
             .query('DELETE FROM Departments WHERE DepartmentID = @ID');
         res.json({ message: 'Department deleted successfully' });
-    } catch (err) { 
-        res.status(400).json({ message: 'Cannot delete department. It may have linked employees or data.' }); 
+    } catch (err) {
+        res.status(400).json({ message: 'Cannot delete department. It may have linked employees or data.' });
     }
 });
 
@@ -971,8 +826,8 @@ app.delete('/api/lookups/designations/:id', authenticateToken, async (req, res) 
             .input('ID', sql.Int, req.params.id)
             .query('DELETE FROM Designations WHERE DesignationID = @ID');
         res.json({ message: 'Designation deleted successfully' });
-    } catch (err) { 
-        res.status(400).json({ message: 'Cannot delete designation. It may be assigned to employees.' }); 
+    } catch (err) {
+        res.status(400).json({ message: 'Cannot delete designation. It may be assigned to employees.' });
     }
 });
 
@@ -1001,7 +856,7 @@ app.get('/api/profile/metrics', authenticateToken, async (req, res) => {
                 )
                 SELECT ISNULL((SELECT Streak FROM LatestGroup), 0) as Streak
             `);
-        
+
         // 2. Peer Recognition (Count of reward entries)
         const peerRes = await pool.request()
             .input('EmpID', sql.Int, empID)
@@ -1028,7 +883,7 @@ app.get('/api/profile/metrics', authenticateToken, async (req, res) => {
 app.get('/api/analytics/workforce-pulse', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
-        
+
         // 1. Departmental Punctuality Leaderboard
         const deptLeaderboard = await pool.request().query(`
             SELECT d.DepartmentName, 
