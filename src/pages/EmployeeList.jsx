@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DataTable from '../components/DataTable';
-import { Search, UserPlus, Filter, MoreVertical, Mail, Phone, Award, ClipboardCheck } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
+import { Search, UserPlus, Filter, MoreVertical, Mail, Phone, Award, ClipboardCheck, Clock } from 'lucide-react';
 
 const EmployeeList = () => {
     const [employees, setEmployees] = useState([]);
@@ -9,9 +10,12 @@ const EmployeeList = () => {
     const [showModal, setShowModal] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [showRewardModal, setShowRewardModal] = useState(false);
+    const [showShiftModal, setShowShiftModal] = useState(false);
     const [selectedEmp, setSelectedEmp] = useState(null);
     const [reviewForm, setReviewForm] = useState({ score: 80, comments: '' });
     const [rewardForm, setRewardForm] = useState({ points: 50, reason: '' });
+    const [shifts, setShifts] = useState([]);
+    const [selectedShift, setSelectedShift] = useState('');
 
     const [newEmp, setNewEmp] = useState({
         EmployeeCode: '', FirstName: '', LastName: '', Gender: 'Male',
@@ -70,6 +74,29 @@ const EmployeeList = () => {
                 alert('Reward Points Awarded');
             }
         } catch (err) { alert('Reward failed'); }
+    };
+
+    const openShiftModal = async (emp) => {
+        setSelectedEmp(emp);
+        setSelectedShift('');
+        const res = await fetch('/api/shifts', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+        if (res.ok) setShifts(await res.json());
+        setShowShiftModal(true);
+    };
+
+    const handleAssignShift = async (e) => {
+        e.preventDefault();
+        if (!selectedShift) return alert('Please select a shift.');
+        try {
+            const res = await fetch('/api/shifts/assign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({ employeeID: selectedEmp.EmployeeID, shiftID: selectedShift })
+            });
+            const d = await res.json();
+            if (res.ok) { setShowShiftModal(false); alert('Shift assigned!'); }
+            else alert(d.message);
+        } catch (err) { alert('Assignment failed'); }
     };
 
     const fetchEmployees = async () => {
@@ -149,6 +176,9 @@ const EmployeeList = () => {
                     </button>
                     <button className="btn glass" style={{ padding: '6px', color: 'var(--warning)' }} title="Reward" onClick={() => { setSelectedEmp(emp); setShowRewardModal(true); }}>
                         <Award size={14} />
+                    </button>
+                    <button className="btn glass" style={{ padding: '6px', color: 'var(--accent)' }} title="Assign Shift" onClick={() => openShiftModal(emp)}>
+                        <Clock size={14} />
                     </button>
                     <button className="btn glass" style={{ padding: '6px' }} title="Email"><Mail size={14} /></button>
                 </div>
@@ -249,6 +279,38 @@ const EmployeeList = () => {
                             </div>
                             <button type="submit" className="btn btn-primary" style={{ width: '100%', background: 'var(--warning)', border: 'none' }}>Grant Reward</button>
                             <button type="button" className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setShowRewardModal(false)}>Cancel</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {showShiftModal && (
+                <div className="modal-overlay">
+                    <div className="card glass modal-content" style={{ maxWidth: '400px' }}>
+                        <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <Clock size={20} color="var(--accent)" /> Assign Shift: {selectedEmp?.FirstName}
+                        </h3>
+                        <form onSubmit={handleAssignShift} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                            <div className="form-group">
+                                <label className="form-label">Select Shift</label>
+                                <CustomSelect
+                                    options={shifts}
+                                    value={selectedShift}
+                                    placeholder="Choose a shift..."
+                                    labelKey="ShiftName"
+                                    valueKey="ShiftID"
+                                    onChange={v => setSelectedShift(v)}
+                                />
+                                {selectedShift && (() => {
+                                    const s = shifts.find(sh => sh.ShiftID === parseInt(selectedShift));
+                                    return s ? (
+                                        <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(139,92,246,0.08)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+                                            ⏰ {s.StartTime?.slice(0,5)} → {s.EndTime?.slice(0,5)}
+                                        </div>
+                                    ) : null;
+                                })()}
+                            </div>
+                            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Assign Shift</button>
+                            <button type="button" className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setShowShiftModal(false)}>Cancel</button>
                         </form>
                     </div>
                 </div>

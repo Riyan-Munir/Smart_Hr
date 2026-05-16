@@ -6,7 +6,9 @@ const Attendance = () => {
     const [attendance, setAttendance] = useState([]);
     const [loading, setLoading] = useState(true);
     const [marking, setMarking] = useState(false);
+    const [checkingOut, setCheckingOut] = useState(false);
     const [hasCheckedIn, setHasCheckedIn] = useState(false);
+    const [hasCheckedOut, setHasCheckedOut] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
 
     useEffect(() => {
@@ -25,10 +27,11 @@ const Attendance = () => {
                 const data = await res.json();
                 setAttendance(data);
                 
-                // Check if already checked in today
+                // Check today's record
                 const today = new Date().toISOString().split('T')[0];
-                const checked = data.some(att => att.Date && att.Date.split('T')[0] === today);
-                setHasCheckedIn(checked);
+                const todayRecord = data.find(att => att.Date === today);
+                setHasCheckedIn(!!todayRecord);
+                setHasCheckedOut(!!todayRecord && todayRecord.CheckedOut === 1);
             }
         } catch (err) {
             console.error('Failed to fetch attendance:', err);
@@ -41,20 +44,16 @@ const Attendance = () => {
         setMarking(true);
         try {
             const token = localStorage.getItem('token');
-            const now = new Date();
-            const timeStr = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
-            
             const res = await fetch('/api/attendance/mark', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}` 
                 },
-                body: JSON.stringify({ checkInTime: timeStr })
+                body: JSON.stringify({})
             });
 
             if (res.ok) {
-                alert('Attendance marked successfully via SQL sp_MarkAttendance!');
                 fetchAttendanceData();
             } else {
                 const data = await res.json();
@@ -67,9 +66,38 @@ const Attendance = () => {
         }
     };
 
+    const handleCheckOut = async () => {
+        setCheckingOut(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/attendance/checkout', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({})
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(data.message);
+                fetchAttendanceData(); // refresh table + working hours
+            } else {
+                const data = await res.json();
+                alert(`Error: ${data.message}`);
+            }
+        } catch (err) {
+            alert('Failed to connect to server.');
+        } finally {
+            setCheckingOut(false);
+        }
+    };
+
     const headers = ['Date', 'Check In', 'Check Out', 'Hours', 'Status'];
 
     const renderRow = (att) => (
+
         <>
             <td>{att.Date}</td>
             <td style={{ color: 'var(--primary)', fontWeight: '600' }}>{att.CheckIn}</td>
@@ -126,12 +154,21 @@ const Attendance = () => {
                             onClick={handleMarkAttendance}
                             disabled={marking || hasCheckedIn}
                         >
-                            <LogIn size={18} /> {marking ? 'Wait...' : hasCheckedIn ? 'Success' : 'Clock In'}
+                            <LogIn size={18} /> {marking ? 'Wait...' : hasCheckedIn ? 'Clocked In ✓' : 'Clock In'}
                         </button>
-                        <button className="btn btn-secondary" style={{ flex: 1, padding: '12px' }}>
-                            <LogOut size={18} /> Clock Out
+                        <button 
+                            className="btn btn-secondary" 
+                            style={{ 
+                                flex: 1, padding: '12px',
+                                opacity: (!hasCheckedIn || hasCheckedOut) ? 0.5 : 1
+                            }}
+                            onClick={handleCheckOut}
+                            disabled={checkingOut || !hasCheckedIn || hasCheckedOut}
+                        >
+                            <LogOut size={18} /> {checkingOut ? 'Wait...' : hasCheckedOut ? 'Clocked Out ✓' : 'Clock Out'}
                         </button>
                     </div>
+
                 </div>
 
                 <div className="card glass" style={{ flex: '2 1 600px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--border)', padding: 0, overflow: 'hidden' }}>

@@ -495,7 +495,8 @@ app.get('/api/attendance/history', authenticateToken, async (req, res) => {
                     ISNULL(FORMAT(CheckInTime, 'hh:mm tt'), 'NOT RECORDED') as CheckIn,
                     ISNULL(FORMAT(CheckOutTime, 'hh:mm tt'), 'NOT RECORDED') as CheckOut,
                     Status,
-                    ISNULL(CAST(WorkingHours AS VARCHAR), '0.0') as Hours
+                    ISNULL(CAST(WorkingHours AS VARCHAR), '0.0') as Hours,
+                    CASE WHEN CheckOutTime IS NOT NULL THEN 1 ELSE 0 END as CheckedOut
                 FROM Attendance 
                 WHERE EmployeeID = @EmpID
                 ORDER BY AttendanceDate DESC
@@ -503,6 +504,52 @@ app.get('/api/attendance/history', authenticateToken, async (req, res) => {
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ message: 'Failed to fetch attendance history' }); }
 });
+
+// Attendance: Clock Out
+app.post('/api/attendance/checkout', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const now = new Date();
+        const checkOutStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+
+        // Check today's attendance record exists and hasn't already been checked out
+        const existing = await pool.request()
+            .input('EmpID', sql.Int, req.user.employeeId)
+            .query(`
+                SELECT AttendanceID, CheckInTime, CheckOutTime 
+                FROM Attendance 
+                WHERE EmployeeID = @EmpID AND AttendanceDate = CAST(GETDATE() AS DATE)
+            `);
+
+        if (existing.recordset.length === 0) {
+            return res.status(400).json({ message: 'No check-in found for today. Please clock in first.' });
+        }
+        if (existing.recordset[0].CheckOutTime !== null) {
+            return res.status(400).json({ message: 'You have already clocked out for today.' });
+        }
+
+        const { AttendanceID, CheckInTime } = existing.recordset[0];
+
+        // Update checkout time and calculate working hours
+        await pool.request()
+            .input('ID', sql.Int, AttendanceID)
+            .input('CheckOut', sql.VarChar(8), checkOutStr)
+            .query(`
+                UPDATE Attendance 
+                SET CheckOutTime = @CheckOut,
+                    WorkingHours = CAST(
+                        DATEDIFF(MINUTE, CheckInTime, CAST(@CheckOut AS TIME)) / 60.0
+                    AS DECIMAL(4,2))
+                WHERE AttendanceID = @ID
+            `);
+
+        res.json({ message: `Clocked out at ${checkOutStr}. Working hours recorded.` });
+    } catch (err) {
+        console.error('❌ Checkout Error:', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 
 // --- DASHBOARD & ANALYTICS ---
 // Combined Stats for Admin and General Dashboard
@@ -907,7 +954,311 @@ app.post('/api/performance/reward', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
+// --- BONUSES ---
+
+app.get('/api/bonuses', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT b.*, e.FirstName + ' ' + e.LastName as EmployeeName, e.EmployeeCode
+            FROM Bonuses b
+            JOIN Employees e ON b.EmployeeID = e.EmployeeID
+            ORDER BY b.BonusDate DESC
+        `);
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch bonuses' }); }
+});
+
+app.post('/api/bonuses', authenticateToken, async (req, res) => {
+    const { employeeID, bonusType, bonusAmount } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('EmpID', sql.Int, employeeID)
+            .input('Type', sql.NVarChar, bonusType)
+            .input('Amount', sql.Decimal, bonusAmount)
+            .query('INSERT INTO Bonuses (EmployeeID, BonusType, BonusAmount) VALUES (@EmpID, @Type, @Amount)');
+        res.json({ message: 'Bonus added successfully' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.delete('/api/bonuses/:id', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID', sql.Int, req.params.id)
+            .query('DELETE FROM Bonuses WHERE BonusID = @ID');
+        res.json({ message: 'Bonus removed' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// --- DEDUCTIONS ---
+
+app.get('/api/deductions', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT d.*, e.FirstName + ' ' + e.LastName as EmployeeName, e.EmployeeCode
+            FROM Deductions d
+            JOIN Employees e ON d.EmployeeID = e.EmployeeID
+            ORDER BY d.DeductionDate DESC
+        `);
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch deductions' }); }
+});
+
+app.post('/api/deductions', authenticateToken, async (req, res) => {
+    const { employeeID, deductionType, deductionAmount } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('EmpID', sql.Int, employeeID)
+            .input('Type', sql.NVarChar, deductionType)
+            .input('Amount', sql.Decimal, deductionAmount)
+            .query('INSERT INTO Deductions (EmployeeID, DeductionType, DeductionAmount) VALUES (@EmpID, @Type, @Amount)');
+        res.json({ message: 'Deduction added successfully' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.delete('/api/deductions/:id', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID', sql.Int, req.params.id)
+            .query('DELETE FROM Deductions WHERE DeductionID = @ID');
+        res.json({ message: 'Deduction removed' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// --- SALARY STRUCTURE ---
+
+app.get('/api/salary-structure', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT ss.*, e.FirstName + ' ' + e.LastName as EmployeeName, e.EmployeeCode
+            FROM SalaryStructure ss
+            JOIN Employees e ON ss.EmployeeID = e.EmployeeID
+            ORDER BY e.FirstName
+        `);
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch salary structures' }); }
+});
+
+app.get('/api/salary-structure/:empId', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('EmpID', sql.Int, req.params.empId)
+            .query('SELECT * FROM SalaryStructure WHERE EmployeeID = @EmpID');
+        res.json(result.recordset[0] || null);
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.post('/api/salary-structure', authenticateToken, async (req, res) => {
+    const { employeeID, basicSalary, houseAllowance, medicalAllowance, transportAllowance } = req.body;
+    try {
+        const pool = await poolPromise;
+        // Upsert: update if exists, insert if not
+        const existing = await pool.request()
+            .input('EmpID', sql.Int, employeeID)
+            .query('SELECT SalaryID FROM SalaryStructure WHERE EmployeeID = @EmpID');
+
+        if (existing.recordset.length > 0) {
+            await pool.request()
+                .input('EmpID', sql.Int, employeeID)
+                .input('Basic', sql.Decimal, basicSalary)
+                .input('House', sql.Decimal, houseAllowance || 0)
+                .input('Medical', sql.Decimal, medicalAllowance || 0)
+                .input('Transport', sql.Decimal, transportAllowance || 0)
+                .query(`UPDATE SalaryStructure 
+                        SET BasicSalary=@Basic, HouseAllowance=@House, MedicalAllowance=@Medical, TransportAllowance=@Transport
+                        WHERE EmployeeID=@EmpID`);
+        } else {
+            await pool.request()
+                .input('EmpID', sql.Int, employeeID)
+                .input('Basic', sql.Decimal, basicSalary)
+                .input('House', sql.Decimal, houseAllowance || 0)
+                .input('Medical', sql.Decimal, medicalAllowance || 0)
+                .input('Transport', sql.Decimal, transportAllowance || 0)
+                .query(`INSERT INTO SalaryStructure (EmployeeID, BasicSalary, HouseAllowance, MedicalAllowance, TransportAllowance)
+                        VALUES (@EmpID, @Basic, @House, @Medical, @Transport)`);
+        }
+        res.json({ message: 'Salary structure saved' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// --- TAX SLABS ---
+
+app.get('/api/tax-slabs', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM TaxSlabs ORDER BY MinSalary ASC');
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch tax slabs' }); }
+});
+
+app.post('/api/tax-slabs', authenticateToken, async (req, res) => {
+    const { minSalary, maxSalary, taxPercentage } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('Min', sql.Decimal, minSalary)
+            .input('Max', sql.Decimal, maxSalary)
+            .input('Tax', sql.Decimal, taxPercentage)
+            .query('INSERT INTO TaxSlabs (MinSalary, MaxSalary, TaxPercentage) VALUES (@Min, @Max, @Tax)');
+        res.json({ message: 'Tax slab added' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.delete('/api/tax-slabs/:id', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID', sql.Int, req.params.id)
+            .query('DELETE FROM TaxSlabs WHERE TaxSlabID = @ID');
+        res.json({ message: 'Tax slab removed' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// --- SHIFTS ---
+
+app.get('/api/shifts', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM Shifts ORDER BY ShiftName');
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch shifts' }); }
+});
+
+app.post('/api/shifts', authenticateToken, async (req, res) => {
+    const { shiftName, startTime, endTime } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('Name', sql.NVarChar, shiftName)
+            .input('Start', sql.VarChar(8), startTime)
+            .input('End', sql.VarChar(8), endTime)
+            .query('INSERT INTO Shifts (ShiftName, StartTime, EndTime) VALUES (@Name, @Start, @End)');
+        res.json({ message: 'Shift created' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.delete('/api/shifts/:id', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID', sql.Int, req.params.id)
+            .query('DELETE FROM Shifts WHERE ShiftID = @ID');
+        res.json({ message: 'Shift deleted' });
+    } catch (err) { res.status(400).json({ message: 'Cannot delete shift. It may be assigned to employees.' }); }
+});
+
+// Employee Shift Assignment
+app.get('/api/shifts/assignments', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT es.*, e.FirstName + ' ' + e.LastName as EmployeeName, e.EmployeeCode,
+                   s.ShiftName, CONVERT(NVARCHAR(8), s.StartTime, 108) as StartTime, 
+                   CONVERT(NVARCHAR(8), s.EndTime, 108) as EndTime
+            FROM EmployeeShifts es
+            JOIN Employees e ON es.EmployeeID = e.EmployeeID
+            JOIN Shifts s ON es.ShiftID = s.ShiftID
+            ORDER BY es.AssignedDate DESC
+        `);
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch assignments' }); }
+});
+
+app.post('/api/shifts/assign', authenticateToken, async (req, res) => {
+    const { employeeID, shiftID } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('EmpID', sql.Int, employeeID)
+            .input('ShiftID', sql.Int, shiftID)
+            .query('INSERT INTO EmployeeShifts (EmployeeID, ShiftID, AssignedDate) VALUES (@EmpID, @ShiftID, CAST(GETDATE() AS DATE))');
+        res.json({ message: 'Shift assigned successfully' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// --- KPIs ---
+
+app.get('/api/kpis', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM KPIs ORDER BY KPIName');
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch KPIs' }); }
+});
+
+app.post('/api/kpis', authenticateToken, async (req, res) => {
+    const { kpiName, kpiWeight } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('Name', sql.NVarChar, kpiName)
+            .input('Weight', sql.Decimal, kpiWeight)
+            .query('INSERT INTO KPIs (KPIName, KPIWeight) VALUES (@Name, @Weight)');
+        res.json({ message: 'KPI created' });
+    } catch (err) { res.status(500).json({ message: 'KPI name must be unique. ' + err.message }); }
+});
+
+app.delete('/api/kpis/:id', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID', sql.Int, req.params.id)
+            .query('DELETE FROM KPIs WHERE KPIID = @ID');
+        res.json({ message: 'KPI deleted' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// --- INTERVIEWS ---
+
+app.get('/api/interviews', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT i.*, a.FirstName + ' ' + a.LastName as ApplicantName, 
+                   a.AppliedPosition, a.Email as ApplicantEmail
+            FROM Interviews i
+            JOIN Applicants a ON i.ApplicantID = a.ApplicantID
+            ORDER BY i.InterviewDate DESC
+        `);
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch interviews' }); }
+});
+
+app.post('/api/interviews', authenticateToken, async (req, res) => {
+    const { applicantID, interviewDate, feedback } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('AppID', sql.Int, applicantID)
+            .input('Date', sql.DateTime, new Date(interviewDate))
+            .input('Feedback', sql.NVarChar, feedback || '')
+            .query('INSERT INTO Interviews (ApplicantID, InterviewDate, Feedback) VALUES (@AppID, @Date, @Feedback)');
+        res.json({ message: 'Interview scheduled' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.put('/api/interviews/:id', authenticateToken, async (req, res) => {
+    const { interviewScore, feedback } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID', sql.Int, req.params.id)
+            .input('Score', sql.Int, interviewScore)
+            .input('Feedback', sql.NVarChar, feedback)
+            .query('UPDATE Interviews SET InterviewScore = @Score, Feedback = @Feedback WHERE InterviewID = @ID');
+        res.json({ message: 'Interview result recorded' });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
 // --- LOOKUP MANAGEMENT ---
+
 
 // Branches
 app.get('/api/lookups/branches', authenticateToken, async (req, res) => {

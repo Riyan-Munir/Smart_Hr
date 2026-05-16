@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, Mail, Phone, Calendar, CheckCircle, XCircle, Clock, FileText, X } from 'lucide-react';
+import { UserPlus, Search, Mail, Phone, Calendar, CheckCircle, XCircle, Clock, FileText, X, Star } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 
 const HireModal = ({ applicant, onClose, onHired }) => {
@@ -261,7 +261,7 @@ const HireModal = ({ applicant, onClose, onHired }) => {
     );
 };
 
-const ApplicantCard = ({ applicant, onHire, onReject }) => (
+const ApplicantCard = ({ applicant, onHire, onReject, onSchedule }) => (
     <div className="card glass" style={{ padding: '16px', marginBottom: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{applicant.FirstName} {applicant.LastName}</div>
@@ -276,10 +276,13 @@ const ApplicantCard = ({ applicant, onHire, onReject }) => (
                 </div>
             )}
         </div>
-        <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+        <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {applicant.Status === 'Applied' && (
                 <>
                     <button className="btn btn-secondary" style={{ flex: 1, fontSize: '0.7rem', padding: '4px' }} onClick={() => onReject(applicant.ApplicantID)}>Reject</button>
+                    <button className="btn glass" style={{ flex: 1, fontSize: '0.7rem', padding: '4px', color: 'var(--accent)', borderColor: 'var(--accent)' }} onClick={() => onSchedule && onSchedule(applicant)}>
+                        <Calendar size={11} /> Interview
+                    </button>
                     <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.7rem', padding: '4px' }} onClick={() => onHire(applicant)}>Hire</button>
                 </>
             )}
@@ -287,10 +290,18 @@ const ApplicantCard = ({ applicant, onHire, onReject }) => (
     </div>
 );
 
+
 const Recruitment = () => {
     const [applicants, setApplicants] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedApplicant, setSelectedApplicant] = useState(null);
+    const [showInterviewModal, setShowInterviewModal] = useState(false);
+    const [interviewTarget, setInterviewTarget] = useState(null);
+    const [interviews, setInterviews] = useState([]);
+    const [scoreTarget, setScoreTarget] = useState(null);
+    const [interviewForm, setInterviewForm] = useState({ interviewDate: '', feedback: '' });
+    const [scoreForm, setScoreForm] = useState({ interviewScore: '', feedback: '' });
+    const [activeView, setActiveView] = useState('pipeline'); // 'pipeline' | 'interviews'
 
     const fetchApplicants = async () => {
         try {
@@ -306,9 +317,43 @@ const Recruitment = () => {
         }
     };
 
+    const fetchInterviews = async () => {
+        try {
+            const res = await fetch('/api/interviews', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+            if (res.ok) setInterviews(await res.json());
+        } catch (err) { console.error(err); }
+    };
+
     useEffect(() => {
         fetchApplicants();
+        fetchInterviews();
     }, []);
+
+    const handleScheduleInterview = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await fetch('/api/interviews', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({ applicantID: interviewTarget.ApplicantID, ...interviewForm })
+            });
+            if (res.ok) { setShowInterviewModal(false); fetchInterviews(); alert('Interview scheduled!'); }
+            else { const d = await res.json(); alert(d.message); }
+        } catch (err) { alert('Failed'); }
+    };
+
+    const handleRecordScore = async (e, interviewID) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(`/api/interviews/${interviewID}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify(scoreForm)
+            });
+            if (res.ok) { setScoreTarget(null); fetchInterviews(); }
+            else { const d = await res.json(); alert(d.message); }
+        } catch (err) { alert('Failed'); }
+    };
 
     const handleReject = async (id) => {
         if (!confirm('Are you sure you want to reject this applicant?')) return;
@@ -334,48 +379,116 @@ const Recruitment = () => {
                     onHired={() => { setSelectedApplicant(null); fetchApplicants(); }} 
                 />
             )}
+            {showInterviewModal && interviewTarget && (
+                <div className="modal-overlay">
+                    <div className="card glass modal-content" style={{ maxWidth: '420px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h3>Schedule Interview: {interviewTarget.FirstName}</h3>
+                            <X onClick={() => setShowInterviewModal(false)} style={{ cursor: 'pointer' }} />
+                        </div>
+                        <form onSubmit={handleScheduleInterview} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                            <div className="form-group">
+                                <label className="form-label">Interview Date & Time</label>
+                                <input type="datetime-local" className="form-input" required
+                                    value={interviewForm.interviewDate}
+                                    onChange={e => setInterviewForm({ ...interviewForm, interviewDate: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Initial Notes / Agenda</label>
+                                <textarea className="form-input" style={{ minHeight: '80px' }}
+                                    placeholder="Topics to cover, instructions..."
+                                    value={interviewForm.feedback}
+                                    onChange={e => setInterviewForm({ ...interviewForm, feedback: e.target.value })} />
+                            </div>
+                            <button type="submit" className="btn btn-primary">Schedule Interview</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>Recruitment Pipeline</h2>
                     <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>Review applications and enroll new talent</p>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div className="form-group" style={{ margin: 0, position: 'relative' }}>
-                        <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-                        <input type="text" className="form-input" placeholder="Search applicants..." style={{ paddingLeft: '48px', minWidth: '300px' }} />
-                    </div>
+                    <button className={`btn ${activeView === 'pipeline' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveView('pipeline')}>
+                        <Clock size={16} /> Pipeline
+                    </button>
+                    <button className={`btn ${activeView === 'interviews' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveView('interviews')}>
+                        <Star size={16} /> Interviews ({interviews.length})
+                    </button>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '2rem', flex: 1, overflowX: 'auto', paddingBottom: '1rem' }}>
-                {columns.map(col => (
-                    <div key={col.status} style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <div style={{ 
-                            display: 'flex', alignItems: 'center', gap: '10px', 
-                            padding: '12px 16px', borderRadius: '12px', background: 'var(--glass)',
-                            borderBottom: `2px solid ${col.color}`
-                        }}>
-                            {col.icon}
-                            <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>{col.title}</span>
-                            <span style={{ 
-                                marginLeft: 'auto', background: 'rgba(255,255,255,0.05)', 
-                                padding: '2px 8px', borderRadius: '20px', fontSize: '0.75rem' 
+            {activeView === 'interviews' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {interviews.length === 0 ? (
+                        <div className="card glass" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>No interviews scheduled yet.</div>
+                    ) : interviews.map(iv => (
+                        <div key={iv.InterviewID} className="card glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem' }}>
+                            <div>
+                                <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{iv.ApplicantName}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>{iv.AppliedPosition}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '4px' }}>
+                                    <Calendar size={12} style={{ marginRight: '4px' }} />
+                                    {new Date(iv.InterviewDate).toLocaleString()}
+                                </div>
+                                {iv.Feedback && <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px', fontStyle: 'italic' }}>{iv.Feedback}</div>}
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                {iv.InterviewScore !== null ? (
+                                    <div style={{ fontWeight: '800', fontSize: '1.5rem', color: iv.InterviewScore >= 70 ? 'var(--success)' : 'var(--error)' }}>
+                                        {iv.InterviewScore}<span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>/100</span>
+                                    </div>
+                                ) : scoreTarget === iv.InterviewID ? (
+                                    <form onSubmit={e => handleRecordScore(e, iv.InterviewID)} style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '160px' }}>
+                                        <input type="number" className="form-input" style={{ padding: '6px' }} min="0" max="100" placeholder="Score 0-100" required
+                                            value={scoreForm.interviewScore} onChange={e => setScoreForm({ ...scoreForm, interviewScore: e.target.value })} />
+                                        <input className="form-input" style={{ padding: '6px' }} placeholder="Feedback"
+                                            value={scoreForm.feedback} onChange={e => setScoreForm({ ...scoreForm, feedback: e.target.value })} />
+                                        <button type="submit" className="btn btn-primary" style={{ padding: '6px', fontSize: '0.75rem' }}>Save</button>
+                                    </form>
+                                ) : (
+                                    <button className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '6px 12px' }} onClick={() => { setScoreTarget(iv.InterviewID); setScoreForm({ interviewScore: '', feedback: iv.Feedback || '' }); }}
+                                    ><Star size={14} /> Record Score</button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div style={{ display: 'flex', gap: '2rem', flex: 1, overflowX: 'auto', paddingBottom: '1rem' }}>
+                    {columns.map(col => (
+                        <div key={col.status} style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div style={{ 
+                                display: 'flex', alignItems: 'center', gap: '10px', 
+                                padding: '12px 16px', borderRadius: '12px', background: 'var(--glass)',
+                                borderBottom: `2px solid ${col.color}`
                             }}>
-                                {applicants.filter(a => a.Status === col.status).length}
-                            </span>
+                                {col.icon}
+                                <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>{col.title}</span>
+                                <span style={{ 
+                                    marginLeft: 'auto', background: 'rgba(255,255,255,0.05)', 
+                                    padding: '2px 8px', borderRadius: '20px', fontSize: '0.75rem' 
+                                }}>
+                                    {applicants.filter(a => a.Status === col.status).length}
+                                </span>
+                            </div>
+                            <div className="scrollable-content-card" style={{ flex: 1, background: 'rgba(0,0,0,0.1)' }}>
+                                {loading ? (
+                                    <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)' }}>Loading...</div>
+                                ) : (
+                                    applicants
+                                        .filter(a => a.Status === col.status)
+                                        .map(a => <ApplicantCard key={a.ApplicantID} applicant={a} onHire={setSelectedApplicant} onReject={handleReject}
+                                            onSchedule={() => { setInterviewTarget(a); setInterviewForm({ interviewDate: '', feedback: '' }); setShowInterviewModal(true); }} />)
+                                )}
+                            </div>
                         </div>
-                        <div className="scrollable-content-card" style={{ flex: 1, background: 'rgba(0,0,0,0.1)' }}>
-                            {loading ? (
-                                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)' }}>Loading...</div>
-                            ) : (
-                                applicants
-                                    .filter(a => a.Status === col.status)
-                                    .map(a => <ApplicantCard key={a.ApplicantID} applicant={a} onHire={setSelectedApplicant} onReject={handleReject} />)
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
