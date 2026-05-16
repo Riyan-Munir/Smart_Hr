@@ -47,20 +47,27 @@ const dbConfig = {
     }
 };
 
-const poolPromise = new sql.ConnectionPool(dbConfig)
-    .connect()
-    .then(pool => {
+// --- DATABASE CONNECTION POOL ---
+const poolPromise = (async () => {
+    try {
+        // Validate Environment Variables
+        const requiredVars = ['DB_USER', 'DB_PASSWORD', 'DB_SERVER', 'DB_NAME', 'JWT_SECRET'];
+        const missingVars = requiredVars.filter(v => !process.env[v]);
+        
+        if (missingVars.length > 0) {
+            throw new Error(`Missing required environment variables: ${missingVars.join(', ')}. Please set them in Vercel settings.`);
+        }
+
+        console.log(`🔌 Attempting to connect to SQL Server: ${dbConfig.server}...`);
+        const pool = await new sql.ConnectionPool(dbConfig).connect();
         console.log('✅ Connected to Azure SQL');
         return pool;
-    })
-    .catch(err => {
-        console.error('❌ Database Connection Failed:', err);
-        // On Vercel, we don't want to crash the process immediately if the connection fails during startup
-        // because serverless functions might retry. But for local dev, this is fine.
-        if (process.env.NODE_ENV !== 'production') {
-            process.exit(1);
-        }
-    });
+    } catch (err) {
+        console.error('❌ Database Connection Failed:', err.message);
+        // We throw the error so that 'await poolPromise' in routes will fail loudly
+        throw err;
+    }
+})();
 
 // --- AUTHENTICATION MIDDLEWARE ---
 const authenticateToken = (req, res, next) => {
@@ -100,7 +107,14 @@ app.post('/api/auth/login', async (req, res) => {
             { expiresIn: '8h' }
         );
         res.json({ token, user: { name: `${user.FirstName} ${user.LastName}`, role: user.RoleName } });
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { 
+        console.error('❌ Login Error:', err.message);
+        res.status(500).json({ 
+            message: 'Database connection or query error', 
+            details: err.message,
+            tip: 'Check Vercel Env Vars and Azure SQL Firewall (Allow Azure Services).' 
+        }); 
+    }
 });
 
 // Lookups (Protected)
@@ -292,7 +306,13 @@ app.get('/api/public/roles', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT RoleID, RoleName FROM Roles');
         res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { 
+        console.error('❌ Public Roles Error:', err.message);
+        res.status(500).json({ 
+            message: 'Failed to fetch roles', 
+            details: err.message 
+        }); 
+    }
 });
 
 // Stats, Attendance, Payroll... 
