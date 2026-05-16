@@ -384,6 +384,54 @@ app.get('/api/employees', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Failed to fetch employees' }); }
 });
 
+// Employees: Enroll (from EmployeeList.jsx quick-add modal)
+// Note: For full hire flow use /api/recruitment/hire instead
+app.post('/api/employees', authenticateToken, async (req, res) => {
+    const { EmployeeCode, FirstName, LastName, Gender, DOB, CNIC, Phone, Email, Address,
+            DepartmentID, DesignationID, BranchID, BasicSalary } = req.body;
+    try {
+        const pool = await poolPromise;
+        // Generate a temporary username and password for the quick-enroll flow
+        const tempUsername = `${FirstName.toLowerCase()}.${LastName.toLowerCase()}${Math.floor(Math.random() * 100)}`;
+        const tempPassword = `TempPass${Math.floor(1000 + Math.random() * 9000)}!`;
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+        // Default role to Employee (RoleID = 4 — adjust if your seed differs)
+        const roleResult = await pool.request().query(`SELECT TOP 1 RoleID FROM Roles WHERE RoleName LIKE '%Employee%'`);
+        const roleID = roleResult.recordset[0]?.RoleID || 4;
+
+        await pool.request()
+            .input('EmployeeCode', sql.NVarChar, EmployeeCode)
+            .input('FirstName', sql.NVarChar, FirstName)
+            .input('LastName', sql.NVarChar, LastName)
+            .input('Gender', sql.NVarChar, Gender || 'Male')
+            .input('DOB', sql.Date, DOB || '1990-01-01')
+            .input('CNIC', sql.NVarChar, CNIC)
+            .input('Phone', sql.NVarChar, Phone || 'N/A')
+            .input('Email', sql.NVarChar, Email)
+            .input('Address', sql.NVarChar, Address || 'N/A')
+            .input('DepartmentID', sql.Int, DepartmentID)
+            .input('DesignationID', sql.Int, DesignationID)
+            .input('BranchID', sql.Int, BranchID)
+            .input('BasicSalary', sql.Decimal, BasicSalary)
+            .input('Username', sql.NVarChar, tempUsername)
+            .input('PasswordHash', sql.NVarChar, hashedPassword)
+            .input('RoleID', sql.Int, roleID)
+            .execute('sp_AddEmployee');
+
+        res.json({ message: `Employee enrolled. Temp username: ${tempUsername}` });
+    } catch (err) {
+        console.error('❌ Employee Enroll Error:', err);
+        let userMessage = 'Enrollment failed.';
+        if (err.number === 2627 || err.number === 2601) {
+            userMessage = 'A duplicate CNIC, Email, or Employee Code was found.';
+        } else {
+            userMessage = err.message;
+        }
+        res.status(400).json({ message: userMessage });
+    }
+});
+
 // Payroll: Generate
 app.post('/api/payroll/generate', authenticateToken, async (req, res) => {
     const { month, year } = req.body;
@@ -398,11 +446,15 @@ app.post('/api/payroll/generate', authenticateToken, async (req, res) => {
 });
 
 // Payroll: History
+// Note: Payroll table has no Status column — using 'Processed' as computed value
 app.get('/api/payroll/history', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT p.*, e.FirstName + ' ' + e.LastName as EmployeeName, e.EmployeeCode
+            SELECT p.*, 
+                   e.FirstName + ' ' + e.LastName as EmployeeName, 
+                   e.EmployeeCode,
+                   'Processed' as Status
             FROM Payroll p
             JOIN Employees e ON p.EmployeeID = e.EmployeeID
             ORDER BY p.GeneratedDate DESC
@@ -413,17 +465,20 @@ app.get('/api/payroll/history', authenticateToken, async (req, res) => {
 
 // Attendance: Mark
 app.post('/api/attendance/mark', authenticateToken, async (req, res) => {
-    const { checkInTime } = req.body;
     try {
         const pool = await poolPromise;
+        // sp_MarkAttendance expects @EmployeeID INT and @CheckInTime TIME
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
         await pool.request()
             .input('EmployeeID', sql.Int, req.user.employeeId)
-            .input('CheckIn', sql.DateTime, new Date())
+            .input('CheckInTime', sql.VarChar(8), timeStr)
             .execute('sp_MarkAttendance');
 
         res.json({ message: 'Attendance marked successfully' });
     } catch (err) {
         console.error('❌ Attendance Error:', err);
+        // Return the SP error message directly (e.g. 'already marked for today')
         res.status(400).json({ message: err.message });
     }
 });
@@ -690,7 +745,7 @@ app.get('/api/leaves/types', authenticateToken, async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT * FROM LeaveTypes');
         res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: 'Failed to respond to leave request' }); }
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch leave types' }); }
 });
 
 // Get Leave Balance for current user

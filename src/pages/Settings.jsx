@@ -25,6 +25,23 @@ const Settings = () => {
         finally { setLoading(false); }
     };
 
+    const handleDelete = async (id) => {
+        const idField = activeTab === 'branches' ? 'BranchID' : activeTab === 'departments' ? 'DepartmentID' : 'DesignationID';
+        if (!window.confirm(`Delete this ${activeTab.slice(0, -1)}? This cannot be undone.`)) return;
+        try {
+            const res = await fetch(`/api/lookups/${activeTab}/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                fetchData();
+            } else {
+                alert(data.message || 'Delete failed.');
+            }
+        } catch (err) { alert('Delete request failed.'); }
+    };
+
     useEffect(() => {
         fetchData();
     }, [activeTab]);
@@ -70,21 +87,21 @@ const Settings = () => {
                 <td><div style={{ fontWeight: '600' }}>{item.BranchName}</div></td>
                 <td>{item.City}</td>
                 <td>{item.Country}</td>
-                <td><button className="btn glass" style={{ color: 'var(--error)' }}><Trash2 size={14} /></button></td>
+                <td><button className="btn glass" style={{ color: 'var(--error)' }} onClick={() => handleDelete(item.BranchID)}><Trash2 size={14} /></button></td>
             </>
         );
         if (activeTab === 'departments') return (
             <>
                 <td><div style={{ fontWeight: '600' }}>{item.DepartmentName}</div></td>
                 <td>{new Date(item.CreatedAt).toLocaleDateString()}</td>
-                <td><button className="btn glass" style={{ color: 'var(--error)' }}><Trash2 size={14} /></button></td>
+                <td><button className="btn glass" style={{ color: 'var(--error)' }} onClick={() => handleDelete(item.DepartmentID)}><Trash2 size={14} /></button></td>
             </>
         );
         return (
             <>
                 <td><div style={{ fontWeight: '600' }}>{item.DesignationName}</div></td>
                 <td>PKR {item.BaseSalary?.toLocaleString() || '0'}</td>
-                <td><button className="btn glass" style={{ color: 'var(--error)' }}><Trash2 size={14} /></button></td>
+                <td><button className="btn glass" style={{ color: 'var(--error)' }} onClick={() => handleDelete(item.DesignationID)}><Trash2 size={14} /></button></td>
             </>
         );
     };
@@ -119,7 +136,7 @@ const Settings = () => {
                     {data.map((item, idx) => (
                         <div key={idx} className="card glass" style={{ position: 'relative', overflow: 'hidden' }}>
                             <div style={{ position: 'absolute', top: 0, right: 0, padding: '12px' }}>
-                                <button className="btn glass" style={{ color: 'var(--error)', padding: '6px' }}><Trash2 size={14} /></button>
+                                <button className="btn glass" style={{ color: 'var(--error)', padding: '6px' }} onClick={() => handleDelete(item.BranchID)}><Trash2 size={14} /></button>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '1.5rem' }}>
                                 <div style={{ 
