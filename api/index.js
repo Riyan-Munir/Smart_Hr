@@ -359,6 +359,96 @@ app.get('/api/public/roles', async (req, res) => {
 });
 
 // Stats, Attendance, Payroll... 
+
+app.get('/api/applicants', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM Applicants ORDER BY CreatedAt DESC');
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch applicants' }); }
+});
+
+// Employees: List
+app.get('/api/employees', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT e.*, d.DepartmentName, des.DesignationName, b.BranchName
+            FROM Employees e
+            JOIN Departments d ON e.DepartmentID = d.DepartmentID
+            JOIN Designations des ON e.DesignationID = des.DesignationID
+            JOIN Branches b ON e.BranchID = b.BranchID
+            ORDER BY e.CreatedAt DESC
+        `);
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch employees' }); }
+});
+
+// Payroll: Generate
+app.post('/api/payroll/generate', authenticateToken, async (req, res) => {
+    const { month, year } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('Month', sql.Int, month)
+            .input('Year', sql.Int, year)
+            .execute('sp_GenerateMonthlyPayroll');
+        res.json({ message: 'Payroll generated successfully' });
+    } catch (err) { res.status(400).json({ message: err.message }); }
+});
+
+// Payroll: History
+app.get('/api/payroll/history', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT p.*, e.FirstName + ' ' + e.LastName as EmployeeName, e.EmployeeCode
+            FROM Payroll p
+            JOIN Employees e ON p.EmployeeID = e.EmployeeID
+            ORDER BY p.GeneratedDate DESC
+        `);
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch payroll history' }); }
+});
+
+// Attendance: Mark
+app.post('/api/attendance/mark', authenticateToken, async (req, res) => {
+    const { checkInTime } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('EmployeeID', sql.Int, req.user.employeeId)
+            .input('CheckIn', sql.DateTime, new Date())
+            .execute('sp_MarkAttendance');
+
+        res.json({ message: 'Attendance marked successfully' });
+    } catch (err) {
+        console.error('❌ Attendance Error:', err);
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Attendance: History
+app.get('/api/attendance/history', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('EmpID', sql.Int, req.user.employeeId)
+            .query(`
+                SELECT 
+                    FORMAT(AttendanceDate, 'yyyy-MM-dd') as Date,
+                    ISNULL(FORMAT(CheckInTime, 'hh:mm tt'), 'NOT RECORDED') as CheckIn,
+                    ISNULL(FORMAT(CheckOutTime, 'hh:mm tt'), 'NOT RECORDED') as CheckOut,
+                    Status,
+                    ISNULL(CAST(WorkingHours AS VARCHAR), '0.0') as Hours
+                FROM Attendance 
+                WHERE EmployeeID = @EmpID
+                ORDER BY AttendanceDate DESC
+            `);
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch attendance history' }); }
+});
+
 // --- DASHBOARD & ANALYTICS ---
 // Combined Stats for Admin and General Dashboard
 app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
@@ -447,6 +537,41 @@ app.get('/api/analytics/personal-hours', authenticateToken, async (req, res) => 
     } catch (err) { 
         console.error('❌ Personal Hours Error:', err.message);
         res.status(500).json({ message: 'Failed to fetch personal performance data' }); 
+    }
+});
+
+// Dashboard: Employee Specific Summary
+app.get('/api/dashboard/employee-summary', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const summary = await pool.request()
+            .input('EmpID', sql.Int, req.user.employeeId)
+            .query(`
+                SELECT 
+                    (SELECT dbo.fn_GetLeaveBalance(@EmpID, 1)) as RemainingLeaves,
+                    (SELECT TOP 1 Status FROM Attendance WHERE EmployeeID = @EmpID AND AttendanceDate = CAST(GETDATE() AS DATE)) as TodayStatus,
+                    (SELECT ISNULL(SUM(Points), 0) FROM EmployeeRewardPoints WHERE EmployeeID = @EmpID) as RewardPoints,
+                    (SELECT TOP 1 CAST(ReviewDate AS DATE) FROM PerformanceReviews WHERE EmployeeID = @EmpID ORDER BY ReviewDate DESC) as LastReview
+            `);
+        res.json(summary.recordset[0]);
+    } catch (err) { res.status(500).json({ message: 'Failed to fetch employee summary' }); }
+});
+
+// Analytics: Workforce Distribution (By Department)
+app.get('/api/analytics/workforce', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT d.DepartmentName as name, COUNT(e.EmployeeID) as value
+            FROM Departments d
+            LEFT JOIN Employees e ON d.DepartmentID = e.DepartmentID
+            GROUP BY d.DepartmentName
+            HAVING COUNT(e.EmployeeID) > 0
+        `);
+        res.json(result.recordset);
+    } catch (err) { 
+        console.error('❌ Workforce Analytics Error:', err.message);
+        res.status(500).json({ message: 'Failed to calculate workforce distribution' }); 
     }
 });
 
@@ -557,25 +682,6 @@ app.post('/api/broadcast', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-// Analytics: Workforce Distribution
-// Analytics: Workforce Distribution (By Department)
-app.get('/api/analytics/workforce', authenticateToken, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request().query(`
-            SELECT d.DepartmentName as name, COUNT(e.EmployeeID) as value
-            FROM Departments d
-            LEFT JOIN Employees e ON d.DepartmentID = e.DepartmentID
-            GROUP BY d.DepartmentName
-            HAVING COUNT(e.EmployeeID) > 0
-        `);
-        res.json(result.recordset);
-    } catch (err) { 
-        console.error('❌ Workforce Analytics Error:', err.message);
-        res.status(500).json({ message: 'Failed to calculate workforce distribution' }); 
-    }
-});
-
 // --- LEAVE MANAGEMENT ---
 
 // Get all Leave Types
@@ -584,7 +690,7 @@ app.get('/api/leaves/types', authenticateToken, async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT * FROM LeaveTypes');
         res.json(result.recordset);
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) { res.status(500).json({ message: 'Failed to respond to leave request' }); }
 });
 
 // Get Leave Balance for current user
