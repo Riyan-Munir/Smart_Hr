@@ -137,7 +137,7 @@ const EmployeeList = () => {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary)'
                     }}>
-                        {emp.FirstName.charAt(0)}{emp.LastName.charAt(0)}
+                        {(emp.FirstName || '?').charAt(0)}{(emp.LastName || '?').charAt(0)}
                     </div>
                     <div>
                         <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>{emp.FirstName} {emp.LastName}</div>

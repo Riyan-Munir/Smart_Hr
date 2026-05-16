@@ -5,7 +5,11 @@ const CustomSelect = ({ options, value, onChange, placeholder, labelKey = 'label
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef(null);
 
-    const selectedOption = options.find(opt => opt[valueKey].toString() === value.toString());
+    const selectedOption = options.find(opt => {
+        if (!opt || opt[valueKey] === undefined || opt[valueKey] === null) return false;
+        if (value === undefined || value === null) return false;
+        return opt[valueKey].toString() === value.toString();
+    });
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -35,7 +39,7 @@ const CustomSelect = ({ options, value, onChange, placeholder, labelKey = 'label
                     {options.map((opt) => (
                         <div 
                             key={opt[valueKey]} 
-                            className={`custom-select-option ${value.toString() === opt[valueKey].toString() ? 'selected' : ''}`}
+                            className={`custom-select-option ${value?.toString() === opt[valueKey]?.toString() ? 'selected' : ''}`}
                             onClick={() => {
                                 onChange(opt[valueKey]);
                                 setIsOpen(false);

@@ -17,14 +17,26 @@ const PublicApply = () => {
     const [roles, setRoles] = useState([]);
     const [submitted, setSubmitted] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [rolesLoading, setRolesLoading] = useState(true);
+    const [rolesError, setRolesError] = useState(null);
     const navigate = useNavigate();
 
     useEffect(() => {
         const fetchRoles = async () => {
+            setRolesLoading(true);
             try {
                 const res = await fetch('/api/public/roles');
-                if (res.ok) setRoles(await res.json());
-            } catch (err) { console.error('Roles fetch failed'); }
+                if (res.ok) {
+                    setRoles(await res.json());
+                } else {
+                    setRolesError('Could not load roles');
+                }
+            } catch (err) { 
+                console.error('Roles fetch failed');
+                setRolesError('Network error');
+            } finally {
+                setRolesLoading(false);
+            }
         };
         fetchRoles();
     }, []);
@@ -207,7 +219,7 @@ const PublicApply = () => {
                         <CustomSelect 
                             options={roles} 
                             value={form.desiredRoleID} 
-                            placeholder="Select a role..."
+                            placeholder={rolesLoading ? "Loading roles..." : rolesError ? rolesError : "Select a role..."}
                             labelKey="RoleName"
                             valueKey="RoleID"
                             onChange={val => {
