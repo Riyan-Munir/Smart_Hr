@@ -535,29 +535,41 @@ app.get('/api/analytics/productivity', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-// Analytics: Risks (Burnout & Attrition)
 // Analytics: Predictive Risks (Burnout & Attrition)
 app.get('/api/analytics/risks', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
         const risks = await pool.request().query(`
-            SELECT TOP 5 e.FirstName + ' ' + e.LastName as Name, 
-                   'Burnout' as Category, 
-                   CAST(COUNT(a.AttendanceID) AS VARCHAR) + ' Lates' as Risk
+            -- Burnout Risk: employees with 2+ late arrivals in last 30 days
+            SELECT TOP 5
+                e.FirstName + ' ' + e.LastName as Name,
+                'Burnout' as Category,
+                CAST(COUNT(a.AttendanceID) AS NVARCHAR) + ' Late Days' as Risk
             FROM Employees e
             JOIN Attendance a ON e.EmployeeID = a.EmployeeID
-            WHERE a.Status = 'Late' AND a.AttendanceDate > DATEADD(day, -30, GETDATE())
+            WHERE a.Status = 'Late'
+              AND a.AttendanceDate > DATEADD(day, -30, GETDATE())
             GROUP BY e.EmployeeID, e.FirstName, e.LastName
             HAVING COUNT(a.AttendanceID) >= 2
+            ORDER BY COUNT(a.AttendanceID) DESC
+
             UNION ALL
-            SELECT TOP 5 e.FirstName + ' ' + e.LastName as Name, 
-                   'Attrition' as Category, 
-                   'Low Engagement' as Risk
+
+            -- Attrition Risk: low/no review score AND no reward points
+            SELECT TOP 5
+                e.FirstName + ' ' + e.LastName as Name,
+                'Attrition' as Category,
+                'Low Engagement' as Risk
             FROM Employees e
-            LEFT JOIN PerformanceReviews pr ON e.EmployeeID = pr.EmployeeID
-            LEFT JOIN EmployeeRewardPoints erp ON e.EmployeeID = erp.EmployeeID
-            WHERE (pr.Score < 60 OR pr.Score IS NULL) AND erp.PointID IS NULL
-            GROUP BY e.EmployeeID, e.FirstName, e.LastName
+            WHERE e.EmploymentStatus = 'Active'
+              AND NOT EXISTS (
+                  SELECT 1 FROM EmployeeRewardPoints erp WHERE erp.EmployeeID = e.EmployeeID
+              )
+              AND (
+                  NOT EXISTS (SELECT 1 FROM PerformanceReviews pr WHERE pr.EmployeeID = e.EmployeeID)
+                  OR EXISTS (SELECT 1 FROM PerformanceReviews pr WHERE pr.EmployeeID = e.EmployeeID AND pr.Score < 60)
+              )
+            ORDER BY e.FirstName
         `);
         res.json(risks.recordset);
     } catch (err) { 
@@ -565,6 +577,7 @@ app.get('/api/analytics/risks', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Failed to calculate workforce risks' }); 
     }
 });
+
 
 // Dashboard: Announcements
 app.get('/api/dashboard/announcements', authenticateToken, async (req, res) => {
