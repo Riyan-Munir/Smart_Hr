@@ -415,7 +415,7 @@ app.post('/api/attendance/mark', authenticateToken, async (req, res) => {
         }
 
         await pool.request()
-            .input('EmpID', sql.Int, req.user.employeeId)
+            .input('EmployeeID', sql.Int, req.user.employeeId)
             .input('CheckIn', sql.DateTime, new Date())
             .execute('sp_MarkAttendance');
             
@@ -899,6 +899,18 @@ app.post('/api/lookups/branches', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
+app.delete('/api/lookups/branches/:id', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID', sql.Int, req.params.id)
+            .query('DELETE FROM Branches WHERE BranchID = @ID');
+        res.json({ message: 'Branch deleted successfully' });
+    } catch (err) { 
+        res.status(400).json({ message: 'Cannot delete branch. It may be linked to existing employees or other records.' }); 
+    }
+});
+
 // Departments
 app.get('/api/lookups/departments', authenticateToken, async (req, res) => {
     try {
@@ -917,6 +929,18 @@ app.post('/api/lookups/departments', authenticateToken, async (req, res) => {
             .query('INSERT INTO Departments (DepartmentName) VALUES (@Name)');
         res.json({ message: 'Department added successfully' });
     } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.delete('/api/lookups/departments/:id', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID', sql.Int, req.params.id)
+            .query('DELETE FROM Departments WHERE DepartmentID = @ID');
+        res.json({ message: 'Department deleted successfully' });
+    } catch (err) { 
+        res.status(400).json({ message: 'Cannot delete department. It may have linked employees or data.' }); 
+    }
 });
 
 // Designations
@@ -938,6 +962,18 @@ app.post('/api/lookups/designations', authenticateToken, async (req, res) => {
             .query('INSERT INTO Designations (DesignationName, BaseSalary) VALUES (@Name, @Base)');
         res.json({ message: 'Designation added successfully' });
     } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.delete('/api/lookups/designations/:id', authenticateToken, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID', sql.Int, req.params.id)
+            .query('DELETE FROM Designations WHERE DesignationID = @ID');
+        res.json({ message: 'Designation deleted successfully' });
+    } catch (err) { 
+        res.status(400).json({ message: 'Cannot delete designation. It may be assigned to employees.' }); 
+    }
 });
 
 // --- ANALYTICS & DASHBOARD ---
