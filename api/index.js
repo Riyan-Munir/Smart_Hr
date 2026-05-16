@@ -1154,7 +1154,7 @@ app.delete('/api/shifts/:id', authenticateToken, async (req, res) => {
     } catch (err) { res.status(400).json({ message: 'Cannot delete shift. It may be assigned to employees.' }); }
 });
 
-// Employee Shift Assignment
+// Employee Shift Assignment — these MUST be defined before /:id to avoid being caught by the param route
 app.get('/api/shifts/assignments', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -1182,6 +1182,7 @@ app.post('/api/shifts/assign', authenticateToken, async (req, res) => {
         res.json({ message: 'Shift assigned successfully' });
     } catch (err) { res.status(500).json({ message: err.message }); }
 });
+
 
 // --- KPIs ---
 

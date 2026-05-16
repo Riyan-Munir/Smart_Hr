@@ -82,7 +82,7 @@ const DataTable = ({ headers, data, renderRow, loading, title = null }) => {
                                 transition: 'all 0.2s',
                                 cursor: 'pointer'
                             }} className="table-row-hover">
-                                {renderRow(item)}
+                                {renderRow(item, idx)}
                             </tr>
                         ))
                     )}
