@@ -81,6 +81,19 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+// --- HEALTH CHECK ---
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        message: 'SmartHR+ API is running',
+        timestamp: new Date().toISOString(),
+        env: {
+            node: process.version,
+            db_configured: !!process.env.DB_SERVER
+        }
+    });
+});
+
 // --- API ROUTES ---
 
 // Auth
