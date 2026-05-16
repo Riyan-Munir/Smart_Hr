@@ -27,9 +27,8 @@ body {
   font-family: 'Outfit', sans-serif;
   background-color: var(--bg);
   color: var(--text);
-  overflow: hidden;
   line-height: 1.5;
-  height: 100vh;
+  min-height: 100vh;
 }
 
 select.form-input option {
