@@ -2,6 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { Building2, Briefcase, Network, Plus, Trash2, Save, Clock, Target, Percent, X } from 'lucide-react';
 import DataTable from '../components/DataTable';
 
+const formatTime = (timeStr) => {
+    if (!timeStr) return '—';
+    let str = String(timeStr);
+    if (str.includes('T')) {
+        str = str.split('T')[1];
+    }
+    const parts = str.split(':');
+    if (parts.length >= 2) {
+        let hours = parseInt(parts[0], 10);
+        const minutes = parts[1].slice(0, 2);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // hour '0' should be '12'
+        const hoursStr = hours < 10 ? `0${hours}` : hours;
+        return `${hoursStr}:${minutes} ${ampm}`;
+    }
+    return str.slice(0, 5);
+};
+
 const Settings = () => {
     const [activeTab, setActiveTab] = useState('branches');
     const [data, setData] = useState([]);
@@ -145,11 +164,12 @@ const Settings = () => {
                 </div>
             ) : activeTab === 'taxslabs' ? (
                 /* Tax Slabs — special read-friendly layout */
-                <div className="card glass">
+                <div className="card glass" style={{ overflow: 'hidden' }}>
                     <div style={{ marginBottom: '1rem', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
                         These brackets drive <code>dbo.fn_CalculateTax()</code> used in payroll generation.
                     </div>
                     <DataTable
+                        containerStyle={{ height: 'auto' }}
                         headers={['Slab', 'Min Salary (PKR)', 'Max Salary (PKR)', 'Tax Rate', 'Action']}
                         data={data} loading={loading}
                         renderRow={(item, idx) => (<>
@@ -177,20 +197,21 @@ const Settings = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                                 <div style={{ textAlign: 'center', flex: 1 }}>
                                     <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Start</p>
-                                    <p style={{ fontWeight: '700', color: 'var(--primary)', marginTop: '4px' }}>{item.StartTime?.slice(0, 5) || '—'}</p>
+                                    <p style={{ fontWeight: '700', color: 'var(--primary)', marginTop: '4px' }}>{formatTime(item.StartTime)}</p>
                                 </div>
                                 <div style={{ width: '1px', background: 'var(--border)' }} />
                                 <div style={{ textAlign: 'center', flex: 1 }}>
                                     <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>End</p>
-                                    <p style={{ fontWeight: '700', color: 'var(--primary)', marginTop: '4px' }}>{item.EndTime?.slice(0, 5) || '—'}</p>
+                                    <p style={{ fontWeight: '700', color: 'var(--primary)', marginTop: '4px' }}>{formatTime(item.EndTime)}</p>
                                 </div>
                             </div>
                         </div>
                     ))}
                 </div>
             ) : activeTab === 'kpis' ? (
-                <div className="card glass">
+                <div className="card glass" style={{ overflow: 'hidden' }}>
                     <DataTable
+                        containerStyle={{ height: 'auto' }}
                         headers={['KPI Name', 'Weight', 'Action']}
                         data={data} loading={loading}
                         renderRow={item => (<>
@@ -209,8 +230,9 @@ const Settings = () => {
                 </div>
             ) : (
                 /* Departments & Designations */
-                <div className="card glass">
+                <div className="card glass" style={{ overflow: 'hidden' }}>
                     <DataTable
+                        containerStyle={{ height: 'auto' }}
                         headers={activeTab === 'departments' ? ['Department Name', 'Created', 'Action'] : ['Designation', 'Base Salary', 'Action']}
                         data={data} loading={loading}
                         renderRow={item => activeTab === 'departments' ? (<>

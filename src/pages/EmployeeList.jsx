@@ -4,6 +4,25 @@ import CustomSelect from '../components/CustomSelect';
 import { Search, UserPlus, Filter, MoreVertical, Mail, Phone, Award, ClipboardCheck, Clock } from 'lucide-react';
 import Popup from '../components/Popup';
 
+const formatTime = (timeStr) => {
+    if (!timeStr) return '—';
+    let str = String(timeStr);
+    if (str.includes('T')) {
+        str = str.split('T')[1];
+    }
+    const parts = str.split(':');
+    if (parts.length >= 2) {
+        let hours = parseInt(parts[0], 10);
+        const minutes = parts[1].slice(0, 2);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // hour '0' should be '12'
+        const hoursStr = hours < 10 ? `0${hours}` : hours;
+        return `${hoursStr}:${minutes} ${ampm}`;
+    }
+    return str.slice(0, 5);
+};
+
 const EmployeeList = () => {
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -440,7 +459,7 @@ const EmployeeList = () => {
                                     const s = shifts.find(sh => sh.ShiftID === parseInt(selectedShift));
                                     return s ? (
                                         <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(139,92,246,0.08)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                                            ⏰ {s.StartTime?.slice(0,5)} → {s.EndTime?.slice(0,5)}
+                                            ⏰ {formatTime(s.StartTime)} → {formatTime(s.EndTime)}
                                         </div>
                                     ) : null;
                                 })()}

@@ -1,6 +1,6 @@
 import { Download } from 'lucide-react';
 
-const DataTable = ({ headers, data, renderRow, loading, title = null }) => {
+const DataTable = ({ headers, data, renderRow, loading, title = null, containerStyle = {} }) => {
     const exportToCSV = () => {
         if (!data || data.length === 0) return;
         const csvRows = [];
@@ -25,7 +25,7 @@ const DataTable = ({ headers, data, renderRow, loading, title = null }) => {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', ...containerStyle }}>
             {(title || data.length > 0) && (
                 <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h4 style={{ fontWeight: '700', fontSize: '0.9rem' }}>{title}</h4>
