@@ -170,7 +170,7 @@ const Settings = () => {
                     </div>
                     <DataTable
                         containerStyle={{ height: 'auto' }}
-                        tableContainerStyle={{ overflow: 'visible', background: 'transparent', border: 'none' }}
+                        tableContainerStyle={{ overflow: 'hidden', height: 'auto', background: 'transparent', border: 'none' }}
                         headers={['Slab', 'Min Salary (PKR)', 'Max Salary (PKR)', 'Tax Rate', 'Action']}
                         data={data} loading={loading}
                         renderRow={(item, idx) => (<>
@@ -213,7 +213,7 @@ const Settings = () => {
                 <div className="card glass" style={{ overflow: 'hidden' }}>
                     <DataTable
                         containerStyle={{ height: 'auto' }}
-                        tableContainerStyle={{ overflow: 'visible', background: 'transparent', border: 'none' }}
+                        tableContainerStyle={{ overflow: 'hidden', height: 'auto', background: 'transparent', border: 'none' }}
                         headers={['KPI Name', 'Weight', 'Action']}
                         data={data} loading={loading}
                         renderRow={item => (<>
@@ -235,7 +235,7 @@ const Settings = () => {
                 <div className="card glass" style={{ overflow: 'hidden' }}>
                     <DataTable
                         containerStyle={{ height: 'auto' }}
-                        tableContainerStyle={{ overflow: 'visible', background: 'transparent', border: 'none' }}
+                        tableContainerStyle={{ overflow: 'hidden', height: 'auto', background: 'transparent', border: 'none' }}
                         headers={activeTab === 'departments' ? ['Department Name', 'Created', 'Action'] : ['Designation', 'Base Salary', 'Action']}
                         data={data} loading={loading}
                         renderRow={item => activeTab === 'departments' ? (<>
