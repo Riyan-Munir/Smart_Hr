@@ -492,8 +492,8 @@ app.get('/api/attendance/history', authenticateToken, async (req, res) => {
             .query(`
                 SELECT 
                     FORMAT(AttendanceDate, 'yyyy-MM-dd') as Date,
-                    ISNULL(FORMAT(CheckInTime, 'hh:mm tt'), 'NOT RECORDED') as CheckIn,
-                    ISNULL(FORMAT(CheckOutTime, 'hh:mm tt'), 'NOT RECORDED') as CheckOut,
+                    ISNULL(FORMAT(CAST(CheckInTime AS DATETIME), 'hh:mm tt'), 'NOT RECORDED') as CheckIn,
+                    ISNULL(FORMAT(CAST(CheckOutTime AS DATETIME), 'hh:mm tt'), 'NOT RECORDED') as CheckOut,
                     Status,
                     ISNULL(CAST(WorkingHours AS VARCHAR), '0.0') as Hours,
                     CASE WHEN CheckOutTime IS NOT NULL THEN 1 ELSE 0 END as CheckedOut
@@ -829,17 +829,14 @@ app.post('/api/leaves/apply', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
         await pool.request()
-            .input('EmpID', sql.Int, req.user.employeeId)
-            .input('TypeID', sql.Int, leaveTypeID)
-            .input('Start', sql.Date, startDate)
-            .input('End', sql.Date, endDate)
+            .input('EmployeeID', sql.Int, req.user.employeeId)
+            .input('LeaveTypeID', sql.Int, leaveTypeID)
+            .input('StartDate', sql.Date, startDate)
+            .input('EndDate', sql.Date, endDate)
             .input('Reason', sql.NVarChar, reason)
-            .query(`
-                INSERT INTO LeaveRequests (EmployeeID, LeaveTypeID, StartDate, EndDate, Reason, Status)
-                VALUES (@EmpID, @TypeID, @Start, @End, @Reason, 'Pending')
-            `);
-        res.json({ message: 'Leave application submitted' });
-    } catch (err) { res.status(500).json({ message: err.message }); }
+            .execute('sp_ApplyLeave');
+        res.json({ message: 'Leave application submitted successfully' });
+    } catch (err) { res.status(400).json({ message: err.message }); }
 });
 
 // Get My Leaves
@@ -882,23 +879,12 @@ app.post('/api/leaves/respond/:id', authenticateToken, async (req, res) => {
     try {
         const pool = await poolPromise;
         await pool.request()
-            .input('ID', sql.Int, req.params.id)
+            .input('LeaveRequestID', sql.Int, req.params.id)
             .input('Status', sql.NVarChar, status)
-            .query('UPDATE LeaveRequests SET Status = @Status WHERE LeaveRequestID = @ID');
+            .execute('sp_RespondToLeave');
 
-        // If approved, add a notification for the employee
-        if (status === 'Approved' || status === 'Rejected') {
-            const leaveRes = await pool.request().input('ID', sql.Int, req.params.id).query('SELECT EmployeeID FROM LeaveRequests WHERE LeaveRequestID = @ID');
-            const empID = leaveRes.recordset[0].EmployeeID;
-            await pool.request()
-                .input('EmpID', sql.Int, empID)
-                .input('Title', sql.NVarChar, `Leave Request ${status}`)
-                .input('Msg', sql.NVarChar, `Your leave request has been ${status.toLowerCase()} by HR.`)
-                .query('INSERT INTO Notifications (EmployeeID, Title, Message) VALUES (@EmpID, @Title, @Msg)');
-        }
-
-        res.json({ message: `Leave request ${status.toLowerCase()}` });
-    } catch (err) { res.status(500).json({ message: err.message }); }
+        res.json({ message: `Leave request ${status.toLowerCase()} successfully` });
+    } catch (err) { res.status(400).json({ message: err.message }); }
 });
 
 // --- PERFORMANCE & REWARDS ---

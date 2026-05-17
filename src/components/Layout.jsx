@@ -14,7 +14,12 @@ const Sidebar = () => {
     const menuGroups = [
         {
             title: 'CORE OPERATIONS',
-            roles: ['System Administrator', 'HR Director', 'Department Head', 'Senior Associate', 'Junior Associate'],
+            roles: [
+                'System Administrator', 'HR Director', 'HR Generalist', 
+                'Recruitment Manager', 'Finance Controller', 'Department Head', 
+                'Technical Lead', 'Senior Associate', 'Junior Associate', 
+                'Intern/Trainee', 'External Auditor', 'Compliance Officer'
+            ],
             items: [
                 { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
                 { name: 'Attendance', icon: <Clock size={20} />, path: '/attendance' },
