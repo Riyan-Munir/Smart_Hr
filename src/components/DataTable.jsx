@@ -1,6 +1,6 @@
 import { Download } from 'lucide-react';
 
-const DataTable = ({ headers, data, renderRow, loading, title = null, containerStyle = {} }) => {
+const DataTable = ({ headers, data, renderRow, loading, title = null, containerStyle = {}, tableContainerStyle = {} }) => {
     const exportToCSV = () => {
         if (!data || data.length === 0) return;
         const csvRows = [];
@@ -47,7 +47,7 @@ const DataTable = ({ headers, data, renderRow, loading, title = null, containerS
                     </button>
                 </div>
             )}
-            <div className="scrollable-content-card" style={{ flex: 1 }}>
+            <div className="scrollable-content-card" style={{ flex: 1, ...tableContainerStyle }}>
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-card)', backdropFilter: 'blur(10px)' }}>
                     <tr>
