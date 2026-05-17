@@ -78,6 +78,7 @@ const Leaves = () => {
                     message: 'Your leave application has been submitted successfully for HR review.' 
                 });
             } else {
+                setShowApplyModal(false);
                 let errMsg = 'Failed to submit leave request.';
                 try {
                     const contentType = res.headers.get('content-type');
@@ -98,6 +99,7 @@ const Leaves = () => {
                 });
             }
         } catch (err) { 
+            setShowApplyModal(false);
             setPopup({ 
                 type: 'error', 
                 title: 'Application Error', 

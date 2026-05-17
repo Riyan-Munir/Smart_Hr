@@ -375,6 +375,7 @@ const Recruitment = () => {
                     message: 'The interview has been successfully scheduled.'
                 }); 
             } else { 
+                setShowInterviewModal(false);
                 let errMsg = 'Could not schedule the interview.';
                 try {
                     const contentType = res.headers.get('content-type');
@@ -395,6 +396,7 @@ const Recruitment = () => {
                 }); 
             }
         } catch (err) { 
+            setShowInterviewModal(false);
             setPopup({
                 type: 'error',
                 title: 'Network Error',
@@ -420,6 +422,7 @@ const Recruitment = () => {
                     message: 'The interview score and feedback have been logged successfully.'
                 });
             } else { 
+                setScoreTarget(null);
                 let errMsg = 'Could not save the interview score.';
                 try {
                     const contentType = res.headers.get('content-type');
@@ -440,6 +443,7 @@ const Recruitment = () => {
                 }); 
             }
         } catch (err) { 
+            setScoreTarget(null);
             setPopup({
                 type: 'error',
                 title: 'Network Error',

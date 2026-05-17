@@ -43,6 +43,7 @@ const EmployeeList = () => {
                     message: 'New employee has been successfully enrolled in the system.'
                 });
             } else {
+                setShowModal(false);
                 let errMsg = 'Could not enroll the employee.';
                 try {
                     const contentType = res.headers.get('content-type');
@@ -63,6 +64,7 @@ const EmployeeList = () => {
                 });
             }
         } catch (err) { 
+            setShowModal(false);
             setPopup({
                 type: 'error',
                 title: 'Enrollment Error',
@@ -90,6 +92,7 @@ const EmployeeList = () => {
                     message: 'Performance review has been successfully submitted.'
                 });
             } else {
+                setShowReviewModal(false);
                 let errMsg = 'Could not submit performance review.';
                 try {
                     const contentType = res.headers.get('content-type');
@@ -110,6 +113,7 @@ const EmployeeList = () => {
                 });
             }
         } catch (err) { 
+            setShowReviewModal(false);
             setPopup({
                 type: 'error',
                 title: 'Review Error',
@@ -137,6 +141,7 @@ const EmployeeList = () => {
                     message: 'Reward points have been successfully granted to the employee.'
                 });
             } else {
+                setShowRewardModal(false);
                 let errMsg = 'Could not award reward points.';
                 try {
                     const contentType = res.headers.get('content-type');
@@ -157,6 +162,7 @@ const EmployeeList = () => {
                 });
             }
         } catch (err) { 
+            setShowRewardModal(false);
             setPopup({
                 type: 'error',
                 title: 'Reward Error',
@@ -196,6 +202,7 @@ const EmployeeList = () => {
                     message: 'The shift has been assigned to the employee successfully.'
                 });
             } else {
+                setShowShiftModal(false);
                 let errMsg = 'Could not assign shift.';
                 try {
                     const contentType = res.headers.get('content-type');
@@ -216,6 +223,7 @@ const EmployeeList = () => {
                 });
             }
         } catch (err) { 
+            setShowShiftModal(false);
             setPopup({
                 type: 'error',
                 title: 'Network Error',
