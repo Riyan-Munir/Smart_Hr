@@ -150,24 +150,28 @@ const Leaves = () => {
                     <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>Leave Management</h2>
                     <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>Track balances and manage time-off requests</p>
                 </div>
-                {!isAdmin && (
-                    <button className="btn btn-primary" onClick={() => setShowApplyModal(true)}>
-                        <Plus size={18} /> Apply for Leave
-                    </button>
-                )}
+                <button className="btn btn-primary" onClick={() => setShowApplyModal(true)}>
+                    <Plus size={18} /> Apply for Leave
+                </button>
             </div>
 
-            {isAdmin && pendingLeaves.length > 0 && (
+            {isAdmin && (
                 <div className="card glass" style={{ borderLeft: '4px solid var(--warning)' }}>
                     <h4 style={{ fontWeight: '700', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Clock size={20} color="var(--warning)" /> Pending Approvals
                     </h4>
-                    <DataTable 
-                        headers={adminHeaders}
-                        data={pendingLeaves}
-                        renderRow={renderAdminRow}
-                        loading={loading}
-                    />
+                    {pendingLeaves.length > 0 ? (
+                        <DataTable 
+                            headers={adminHeaders}
+                            data={pendingLeaves}
+                            renderRow={renderAdminRow}
+                            loading={loading}
+                        />
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)', fontSize: '0.9rem' }}>
+                            No pending leave requests to review at this time.
+                        </div>
+                    )}
                 </div>
             )}
 
