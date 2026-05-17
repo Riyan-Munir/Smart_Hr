@@ -97,18 +97,30 @@ const Profile = () => {
                 setIsEditing(false);
                 fetchProfileData();
             } else {
-                const data = await res.json();
+                let errMsg = 'Failed to save profile changes.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Update Failed',
-                    message: data.message || 'Failed to save profile changes.'
+                    message: errMsg
                 });
             }
         } catch (err) {
             setPopup({
                 type: 'error',
                 title: 'Network Error',
-                message: 'A network error occurred while updating your profile.'
+                message: err.message || 'A network error occurred while updating your profile.'
             });
         }
     };

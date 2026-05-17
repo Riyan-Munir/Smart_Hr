@@ -78,18 +78,30 @@ const Leaves = () => {
                     message: 'Your leave application has been submitted successfully for HR review.' 
                 });
             } else {
-                const data = await res.json();
+                let errMsg = 'Failed to submit leave request.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({ 
                     type: 'error', 
                     title: 'Application Failed', 
-                    message: data.message || 'Failed to submit leave request.' 
+                    message: errMsg 
                 });
             }
         } catch (err) { 
             setPopup({ 
                 type: 'error', 
                 title: 'Application Error', 
-                message: 'A network error occurred while submitting your leave application.' 
+                message: err.message || 'A network error occurred while submitting your leave application.' 
             }); 
         }
     };
@@ -112,18 +124,30 @@ const Leaves = () => {
                     message: `The leave request has been successfully ${status.toLowerCase()}.` 
                 });
             } else {
-                const data = await res.json();
+                let errMsg = 'Could not process leave request.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({ 
                     type: 'error', 
                     title: 'Action Failed', 
-                    message: data.message || 'Could not process leave request.' 
+                    message: errMsg 
                 });
             }
         } catch (err) { 
             setPopup({ 
                 type: 'error', 
                 title: 'Network Error', 
-                message: 'A network error occurred while updating the leave request.' 
+                message: err.message || 'A network error occurred while updating the leave request.' 
             }); 
         }
     };

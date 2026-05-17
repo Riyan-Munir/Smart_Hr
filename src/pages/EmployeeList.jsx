@@ -43,18 +43,30 @@ const EmployeeList = () => {
                     message: 'New employee has been successfully enrolled in the system.'
                 });
             } else {
-                const data = await res.json();
+                let errMsg = 'Could not enroll the employee.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Enrollment Failed',
-                    message: data.message || 'Could not enroll the employee.'
+                    message: errMsg
                 });
             }
         } catch (err) { 
             setPopup({
                 type: 'error',
                 title: 'Enrollment Error',
-                message: 'A network error occurred during employee enrollment.'
+                message: err.message || 'A network error occurred during employee enrollment.'
             }); 
         }
     };
@@ -78,18 +90,30 @@ const EmployeeList = () => {
                     message: 'Performance review has been successfully submitted.'
                 });
             } else {
-                const data = await res.json();
+                let errMsg = 'Could not submit performance review.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Submission Failed',
-                    message: data.message || 'Could not submit performance review.'
+                    message: errMsg
                 });
             }
         } catch (err) { 
             setPopup({
                 type: 'error',
                 title: 'Review Error',
-                message: 'A network error occurred while submitting the review.'
+                message: err.message || 'A network error occurred while submitting the review.'
             }); 
         }
     };
@@ -113,18 +137,30 @@ const EmployeeList = () => {
                     message: 'Reward points have been successfully granted to the employee.'
                 });
             } else {
-                const data = await res.json();
+                let errMsg = 'Could not award reward points.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Award Failed',
-                    message: data.message || 'Could not award reward points.'
+                    message: errMsg
                 });
             }
         } catch (err) { 
             setPopup({
                 type: 'error',
                 title: 'Reward Error',
-                message: 'A network error occurred while granting reward points.'
+                message: err.message || 'A network error occurred while granting reward points.'
             }); 
         }
     };
@@ -152,7 +188,6 @@ const EmployeeList = () => {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                 body: JSON.stringify({ employeeID: selectedEmp.EmployeeID, shiftID: selectedShift })
             });
-            const d = await res.json();
             if (res.ok) { 
                 setShowShiftModal(false); 
                 setPopup({
@@ -161,17 +196,30 @@ const EmployeeList = () => {
                     message: 'The shift has been assigned to the employee successfully.'
                 });
             } else {
+                let errMsg = 'Could not assign shift.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Assignment Failed',
-                    message: d.message || 'Could not assign shift.'
+                    message: errMsg
                 });
             }
         } catch (err) { 
             setPopup({
                 type: 'error',
                 title: 'Network Error',
-                message: 'A network error occurred while assigning the shift.'
+                message: err.message || 'A network error occurred while assigning the shift.'
             }); 
         }
     };

@@ -91,19 +91,31 @@ const HireModal = ({ applicant, onClose, onHired, setPopup }) => {
                 });
                 onHired();
             } else {
-                const data = await res.json();
-                setErrors(prev => ({ ...prev, server: data.message || 'Hiring failed' }));
+                let errMsg = 'Failed to complete hiring operation.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
+                setErrors(prev => ({ ...prev, server: errMsg }));
                 setPopup({
                     type: 'error',
                     title: 'Hiring Failed',
-                    message: data.message || 'Failed to complete hiring operation.'
+                    message: errMsg
                 });
             }
         } catch (err) { 
             setPopup({
                 type: 'error',
                 title: 'Hiring Error',
-                message: 'A network error occurred while processing hiring enrollment.'
+                message: err.message || 'A network error occurred while processing hiring enrollment.'
             });
         }
         finally { setLoading(false); }
@@ -363,18 +375,30 @@ const Recruitment = () => {
                     message: 'The interview has been successfully scheduled.'
                 }); 
             } else { 
-                const d = await res.json(); 
+                let errMsg = 'Could not schedule the interview.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Scheduling Failed',
-                    message: d.message || 'Could not schedule the interview.'
+                    message: errMsg
                 }); 
             }
         } catch (err) { 
             setPopup({
                 type: 'error',
                 title: 'Network Error',
-                message: 'Failed to connect to backend to schedule interview.'
+                message: err.message || 'Failed to connect to backend to schedule interview.'
             }); 
         }
     };
@@ -396,29 +420,75 @@ const Recruitment = () => {
                     message: 'The interview score and feedback have been logged successfully.'
                 });
             } else { 
-                const d = await res.json(); 
+                let errMsg = 'Could not save the interview score.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Recording Failed',
-                    message: d.message || 'Could not save the interview score.'
+                    message: errMsg
                 }); 
             }
         } catch (err) { 
             setPopup({
                 type: 'error',
                 title: 'Network Error',
-                message: 'Failed to record the interview score.'
+                message: err.message || 'Failed to record the interview score.'
             }); 
         }
     };
 
     const handleReject = async (id) => {
         if (!confirm('Are you sure you want to reject this applicant?')) return;
-        const res = await fetch(`/api/recruitment/reject/${id}`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (res.ok) fetchApplicants();
+        try {
+            const res = await fetch(`/api/recruitment/reject/${id}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (res.ok) {
+                fetchApplicants();
+                setPopup({
+                    type: 'success',
+                    title: 'Applicant Rejected',
+                    message: 'The applicant has been successfully processed and notified.'
+                });
+            } else {
+                let errMsg = 'Could not reject the applicant.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
+                setPopup({
+                    type: 'error',
+                    title: 'Rejection Failed',
+                    message: errMsg
+                });
+            }
+        } catch (err) {
+            setPopup({
+                type: 'error',
+                title: 'Network Error',
+                message: err.message || 'A network error occurred while rejecting the applicant.'
+            });
+        }
     };
 
     const columns = [

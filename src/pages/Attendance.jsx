@@ -63,18 +63,30 @@ const Attendance = () => {
                 });
                 fetchAttendanceData();
             } else {
-                const data = await res.json();
+                let errMsg = 'Could not complete clock in.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Clock In Failed',
-                    message: data.message || 'Could not complete clock in.'
+                    message: errMsg
                 });
             }
         } catch (err) {
             setPopup({
                 type: 'error',
                 title: 'Network Error',
-                message: 'Failed to connect to the server for clock in.'
+                message: err.message || 'Failed to connect to the server for clock in.'
             });
         } finally {
             setMarking(false);
@@ -103,18 +115,30 @@ const Attendance = () => {
                 });
                 fetchAttendanceData(); // refresh table + working hours
             } else {
-                const data = await res.json();
+                let errMsg = 'Could not complete clock out.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Clock Out Failed',
-                    message: data.message || 'Could not complete clock out.'
+                    message: errMsg
                 });
             }
         } catch (err) {
             setPopup({
                 type: 'error',
                 title: 'Network Error',
-                message: 'Failed to connect to the server for clock out.'
+                message: err.message || 'Failed to connect to the server for clock out.'
             });
         } finally {
             setCheckingOut(false);

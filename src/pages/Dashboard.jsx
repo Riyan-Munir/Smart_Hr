@@ -102,18 +102,30 @@ const Dashboard = () => {
                 });
                 setBroadcastData({ title: '', message: '' });
             } else {
-                const data = await res.json();
+                let errMsg = 'Could not send public broadcast.';
+                try {
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } else {
+                        const text = await res.text();
+                        errMsg = text || errMsg;
+                    }
+                } catch (parseErr) {
+                    errMsg = `Status ${res.status}: ${res.statusText || 'Unknown Error'}`;
+                }
                 setPopup({
                     type: 'error',
                     title: 'Broadcast Failed',
-                    message: data.message || 'Could not send public broadcast.'
+                    message: errMsg
                 });
             }
         } catch (err) { 
             setPopup({
                 type: 'error',
                 title: 'Network Error',
-                message: 'Failed to submit broadcast announcement.'
+                message: err.message || 'Failed to submit broadcast announcement.'
             }); 
         }
     };
