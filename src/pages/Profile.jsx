@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, MapPin, Shield, Calendar, Award, Lock, Edit2, Save } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import Popup from '../components/Popup';
 
 const Profile = () => {
     const { user } = useAuth();
@@ -13,6 +14,7 @@ const Profile = () => {
         FirstName: '', LastName: '', Phone: '', Address: '', 
         Gender: 'Male', DOB: '', CNIC: '', Password: ''
     });
+    const [popup, setPopup] = useState(null);
 
     const fetchProfileData = async () => {
         try {
@@ -87,12 +89,27 @@ const Profile = () => {
                 body: JSON.stringify(formData)
             });
             if (res.ok) {
-                alert('Profile updated successfully!');
+                setPopup({
+                    type: 'success',
+                    title: 'Profile Updated!',
+                    message: 'Your profile changes have been successfully saved.'
+                });
                 setIsEditing(false);
                 fetchProfileData();
+            } else {
+                const data = await res.json();
+                setPopup({
+                    type: 'error',
+                    title: 'Update Failed',
+                    message: data.message || 'Failed to save profile changes.'
+                });
             }
         } catch (err) {
-            alert('Failed to update profile');
+            setPopup({
+                type: 'error',
+                title: 'Network Error',
+                message: 'A network error occurred while updating your profile.'
+            });
         }
     };
 
@@ -310,6 +327,7 @@ const Profile = () => {
                     </p>
                 )}
             </div>
+            {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
         </div>
     );
 };

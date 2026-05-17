@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DataTable from '../components/DataTable';
 import { Clock, MapPin, CheckCircle2, AlertCircle, LogIn, LogOut } from 'lucide-react';
+import Popup from '../components/Popup';
 
 const Attendance = () => {
     const [attendance, setAttendance] = useState([]);
@@ -10,6 +11,7 @@ const Attendance = () => {
     const [hasCheckedIn, setHasCheckedIn] = useState(false);
     const [hasCheckedOut, setHasCheckedOut] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
+    const [popup, setPopup] = useState(null);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date().toLocaleTimeString()), 1000);
@@ -54,13 +56,26 @@ const Attendance = () => {
             });
 
             if (res.ok) {
+                setPopup({
+                    type: 'success',
+                    title: 'Clock In Successful!',
+                    message: 'Your shift clock-in time has been logged successfully.'
+                });
                 fetchAttendanceData();
             } else {
                 const data = await res.json();
-                alert(`Error: ${data.message}`);
+                setPopup({
+                    type: 'error',
+                    title: 'Clock In Failed',
+                    message: data.message || 'Could not complete clock in.'
+                });
             }
         } catch (err) {
-            alert('Failed to connect to server.');
+            setPopup({
+                type: 'error',
+                title: 'Network Error',
+                message: 'Failed to connect to the server for clock in.'
+            });
         } finally {
             setMarking(false);
         }
@@ -81,14 +96,26 @@ const Attendance = () => {
 
             if (res.ok) {
                 const data = await res.json();
-                alert(data.message);
+                setPopup({
+                    type: 'success',
+                    title: 'Clock Out Successful!',
+                    message: data.message || 'Your shift clock-out time has been logged successfully.'
+                });
                 fetchAttendanceData(); // refresh table + working hours
             } else {
                 const data = await res.json();
-                alert(`Error: ${data.message}`);
+                setPopup({
+                    type: 'error',
+                    title: 'Clock Out Failed',
+                    message: data.message || 'Could not complete clock out.'
+                });
             }
         } catch (err) {
-            alert('Failed to connect to server.');
+            setPopup({
+                type: 'error',
+                title: 'Network Error',
+                message: 'Failed to connect to the server for clock out.'
+            });
         } finally {
             setCheckingOut(false);
         }
@@ -208,6 +235,8 @@ const Attendance = () => {
                     <DataTable headers={headers} data={attendance} renderRow={renderRow} loading={loading} />
                 </div>
             </div>
+            
+            {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
         </div>
     );
 };

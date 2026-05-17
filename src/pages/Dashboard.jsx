@@ -5,6 +5,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, 
     Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend 
 } from 'recharts';
+import Popup from '../components/Popup';
 
 const StatCard = ({ title, value, icon, color, trend = null }) => (
     <div className="card glass stat-card">
@@ -42,6 +43,7 @@ const Dashboard = () => {
     const [announcements, setAnnouncements] = useState([]);
     const [loading, setLoading] = useState(true);
     const [broadcastData, setBroadcastData] = useState({ title: '', message: '' });
+    const [popup, setPopup] = useState(null);
 
     const isAdmin = ['System Administrator', 'HR Director', 'Finance Controller', 'Recruitment Manager'].includes(user?.role);
 
@@ -93,10 +95,27 @@ const Dashboard = () => {
                 body: JSON.stringify(broadcastData)
             });
             if (res.ok) {
-                alert('Broadcast Sent Successfully!');
+                setPopup({
+                    type: 'success',
+                    title: 'Broadcast Published!',
+                    message: 'The announcement has been successfully broadcast to all employees.'
+                });
                 setBroadcastData({ title: '', message: '' });
+            } else {
+                const data = await res.json();
+                setPopup({
+                    type: 'error',
+                    title: 'Broadcast Failed',
+                    message: data.message || 'Could not send public broadcast.'
+                });
             }
-        } catch (err) { alert('Broadcast failed'); }
+        } catch (err) { 
+            setPopup({
+                type: 'error',
+                title: 'Network Error',
+                message: 'Failed to submit broadcast announcement.'
+            }); 
+        }
     };
 
     if (loading) return (
@@ -265,6 +284,7 @@ const Dashboard = () => {
                     )}
                 </div>
             </div>
+            {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
         </div>
     );
 };

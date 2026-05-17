@@ -3,6 +3,7 @@ import { Calendar, CheckCircle, XCircle, Clock, Plus, Filter, Info } from 'lucid
 import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/DataTable';
 import CustomSelect from '../components/CustomSelect';
+import Popup from '../components/Popup';
 
 const Leaves = () => {
     const { user } = useAuth();
@@ -13,6 +14,7 @@ const Leaves = () => {
     const [loading, setLoading] = useState(true);
     const [showApplyModal, setShowApplyModal] = useState(false);
     const [form, setForm] = useState({ leaveTypeID: '', startDate: '', endDate: '', reason: '' });
+    const [popup, setPopup] = useState(null);
 
     const isAdmin = ['System Administrator', 'HR Director'].includes(user?.role);
 
@@ -70,8 +72,26 @@ const Leaves = () => {
                 fetchData();
                 setForm({ leaveTypeID: '', startDate: '', endDate: '', reason: '' });
                 setBalance(null);
+                setPopup({ 
+                    type: 'success', 
+                    title: 'Leave Applied!', 
+                    message: 'Your leave application has been submitted successfully for HR review.' 
+                });
+            } else {
+                const data = await res.json();
+                setPopup({ 
+                    type: 'error', 
+                    title: 'Application Failed', 
+                    message: data.message || 'Failed to submit leave request.' 
+                });
             }
-        } catch (err) { alert('Application failed'); }
+        } catch (err) { 
+            setPopup({ 
+                type: 'error', 
+                title: 'Application Error', 
+                message: 'A network error occurred while submitting your leave application.' 
+            }); 
+        }
     };
 
     const handleRespond = async (id, status) => {
@@ -84,8 +104,28 @@ const Leaves = () => {
                 },
                 body: JSON.stringify({ status })
             });
-            if (res.ok) fetchData();
-        } catch (err) { alert('Action failed'); }
+            if (res.ok) {
+                fetchData();
+                setPopup({ 
+                    type: 'success', 
+                    title: 'Leave Request Processed!', 
+                    message: `The leave request has been successfully ${status.toLowerCase()}.` 
+                });
+            } else {
+                const data = await res.json();
+                setPopup({ 
+                    type: 'error', 
+                    title: 'Action Failed', 
+                    message: data.message || 'Could not process leave request.' 
+                });
+            }
+        } catch (err) { 
+            setPopup({ 
+                type: 'error', 
+                title: 'Network Error', 
+                message: 'A network error occurred while updating the leave request.' 
+            }); 
+        }
     };
 
     const headers = ['Type', 'Period', 'Reason', 'Status', 'Applied'];
@@ -156,17 +196,111 @@ const Leaves = () => {
             </div>
 
             {isAdmin && (
-                <div className="card glass" style={{ borderLeft: '4px solid var(--warning)' }}>
+                <div className="card glass" style={{ borderLeft: '4px solid var(--warning)', padding: '1.5rem' }}>
                     <h4 style={{ fontWeight: '700', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Clock size={20} color="var(--warning)" /> Pending Approvals
                     </h4>
                     {pendingLeaves.length > 0 ? (
-                        <DataTable 
-                            headers={adminHeaders}
-                            data={pendingLeaves}
-                            renderRow={renderAdminRow}
-                            loading={loading}
-                        />
+                        <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                            gap: '1.5rem',
+                            marginTop: '0.5rem'
+                        }}>
+                            {pendingLeaves.map(l => (
+                                <div key={l.LeaveRequestID} className="card glass" style={{ 
+                                    padding: '1.25rem', 
+                                    background: 'rgba(255,255,255,0.02)', 
+                                    border: '1px solid rgba(255,255,255,0.06)',
+                                    borderRadius: '16px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.75rem',
+                                    transition: 'all 0.3s ease'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div>
+                                            <h5 style={{ fontWeight: '700', fontSize: '1rem', margin: 0, color: 'var(--text)' }}>
+                                                {l.FirstName} {l.LastName}
+                                            </h5>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '600' }}>
+                                                {l.LeaveTypeName}
+                                            </span>
+                                        </div>
+                                        <div className="status-badge" style={{ 
+                                            fontSize: '0.7rem', 
+                                            background: 'rgba(245, 158, 11, 0.1)', 
+                                            color: 'var(--warning)', 
+                                            padding: '4px 8px', 
+                                            borderRadius: '8px',
+                                            fontWeight: '600'
+                                        }}>
+                                            Pending
+                                        </div>
+                                    </div>
+                                    
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+                                        <div><strong>Period:</strong> {new Date(l.StartDate).toLocaleDateString()} - {new Date(l.EndDate).toLocaleDateString()}</div>
+                                        <div><strong>Applied:</strong> {new Date(l.AppliedDate).toLocaleDateString()}</div>
+                                    </div>
+
+                                    <div style={{ 
+                                        background: 'rgba(255,255,255,0.03)', 
+                                        padding: '10px 12px', 
+                                        borderRadius: '8px', 
+                                        fontSize: '0.8rem', 
+                                        color: 'var(--text)', 
+                                        fontStyle: l.Reason ? 'italic' : 'normal',
+                                        border: '1px solid rgba(255,255,255,0.04)',
+                                        flexGrow: 1,
+                                        lineHeight: '1.4'
+                                    }}>
+                                        {l.Reason ? `"${l.Reason}"` : 'No reason provided.'}
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
+                                        <button 
+                                            className="btn btn-primary" 
+                                            style={{ 
+                                                flex: 1, 
+                                                padding: '8px', 
+                                                fontSize: '0.8rem', 
+                                                background: 'rgba(34, 197, 94, 0.12)', 
+                                                color: 'var(--success)', 
+                                                border: '1px solid rgba(34, 197, 94, 0.25)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '6px',
+                                                cursor: 'pointer'
+                                            }} 
+                                            onClick={() => handleRespond(l.LeaveRequestID, 'Approved')}
+                                        >
+                                            <CheckCircle size={14} /> Approve
+                                        </button>
+                                        <button 
+                                            className="btn btn-secondary" 
+                                            style={{ 
+                                                flex: 1, 
+                                                padding: '8px', 
+                                                fontSize: '0.8rem', 
+                                                background: 'rgba(239, 68, 68, 0.12)', 
+                                                color: 'var(--error)', 
+                                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '6px',
+                                                cursor: 'pointer'
+                                            }} 
+                                            onClick={() => handleRespond(l.LeaveRequestID, 'Rejected')}
+                                        >
+                                            <XCircle size={14} /> Reject
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     ) : (
                         <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)', fontSize: '0.9rem' }}>
                             No pending leave requests to review at this time.
@@ -231,6 +365,8 @@ const Leaves = () => {
                     </div>
                 </div>
             )}
+            
+            {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
         </div>
     );
 };

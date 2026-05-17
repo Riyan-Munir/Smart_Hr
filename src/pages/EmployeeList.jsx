@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DataTable from '../components/DataTable';
 import CustomSelect from '../components/CustomSelect';
 import { Search, UserPlus, Filter, MoreVertical, Mail, Phone, Award, ClipboardCheck, Clock } from 'lucide-react';
+import Popup from '../components/Popup';
 
 const EmployeeList = () => {
     const [employees, setEmployees] = useState([]);
@@ -22,6 +23,7 @@ const EmployeeList = () => {
         DOB: '', CNIC: '', Phone: '', Email: '', Address: '',
         DepartmentID: 1, DesignationID: 1, BranchID: 1, BasicSalary: 0
     });
+    const [popup, setPopup] = useState(null);
 
     const handleEnroll = async (e) => {
         e.preventDefault();
@@ -35,9 +37,26 @@ const EmployeeList = () => {
             if (res.ok) {
                 setShowModal(false);
                 fetchEmployees();
-                alert('Employee Enrolled Successfully via SQL SP!');
+                setPopup({
+                    type: 'success',
+                    title: 'Employee Enrolled!',
+                    message: 'New employee has been successfully enrolled in the system.'
+                });
+            } else {
+                const data = await res.json();
+                setPopup({
+                    type: 'error',
+                    title: 'Enrollment Failed',
+                    message: data.message || 'Could not enroll the employee.'
+                });
             }
-        } catch (err) { alert('Enrollment failed'); }
+        } catch (err) { 
+            setPopup({
+                type: 'error',
+                title: 'Enrollment Error',
+                message: 'A network error occurred during employee enrollment.'
+            }); 
+        }
     };
 
     const handleReview = async (e) => {
@@ -53,9 +72,26 @@ const EmployeeList = () => {
             });
             if (res.ok) {
                 setShowReviewModal(false);
-                alert('Review Published');
+                setPopup({
+                    type: 'success',
+                    title: 'Review Published!',
+                    message: 'Performance review has been successfully submitted.'
+                });
+            } else {
+                const data = await res.json();
+                setPopup({
+                    type: 'error',
+                    title: 'Submission Failed',
+                    message: data.message || 'Could not submit performance review.'
+                });
             }
-        } catch (err) { alert('Review failed'); }
+        } catch (err) { 
+            setPopup({
+                type: 'error',
+                title: 'Review Error',
+                message: 'A network error occurred while submitting the review.'
+            }); 
+        }
     };
 
     const handleReward = async (e) => {
@@ -71,9 +107,26 @@ const EmployeeList = () => {
             });
             if (res.ok) {
                 setShowRewardModal(false);
-                alert('Reward Points Awarded');
+                setPopup({
+                    type: 'success',
+                    title: 'Points Awarded!',
+                    message: 'Reward points have been successfully granted to the employee.'
+                });
+            } else {
+                const data = await res.json();
+                setPopup({
+                    type: 'error',
+                    title: 'Award Failed',
+                    message: data.message || 'Could not award reward points.'
+                });
             }
-        } catch (err) { alert('Reward failed'); }
+        } catch (err) { 
+            setPopup({
+                type: 'error',
+                title: 'Reward Error',
+                message: 'A network error occurred while granting reward points.'
+            }); 
+        }
     };
 
     const openShiftModal = async (emp) => {
@@ -86,7 +139,13 @@ const EmployeeList = () => {
 
     const handleAssignShift = async (e) => {
         e.preventDefault();
-        if (!selectedShift) return alert('Please select a shift.');
+        if (!selectedShift) {
+            return setPopup({
+                type: 'warning',
+                title: 'Selection Required',
+                message: 'Please select a shift from the options before assigning.'
+            });
+        }
         try {
             const res = await fetch('/api/shifts/assign', {
                 method: 'POST',
@@ -94,9 +153,27 @@ const EmployeeList = () => {
                 body: JSON.stringify({ employeeID: selectedEmp.EmployeeID, shiftID: selectedShift })
             });
             const d = await res.json();
-            if (res.ok) { setShowShiftModal(false); alert('Shift assigned!'); }
-            else alert(d.message);
-        } catch (err) { alert('Assignment failed'); }
+            if (res.ok) { 
+                setShowShiftModal(false); 
+                setPopup({
+                    type: 'success',
+                    title: 'Shift Assigned!',
+                    message: 'The shift has been assigned to the employee successfully.'
+                });
+            } else {
+                setPopup({
+                    type: 'error',
+                    title: 'Assignment Failed',
+                    message: d.message || 'Could not assign shift.'
+                });
+            }
+        } catch (err) { 
+            setPopup({
+                type: 'error',
+                title: 'Network Error',
+                message: 'A network error occurred while assigning the shift.'
+            }); 
+        }
     };
 
     const fetchEmployees = async () => {
@@ -318,6 +395,7 @@ const EmployeeList = () => {
                     </div>
                 </div>
             )}
+            {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
         </div>
     );
 };

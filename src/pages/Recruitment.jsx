@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Mail, Phone, Calendar, CheckCircle, XCircle, Clock, FileText, X, Star } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
+import Popup from '../components/Popup';
 
-const HireModal = ({ applicant, onClose, onHired }) => {
+const HireModal = ({ applicant, onClose, onHired, setPopup }) => {
     const [formData, setFormData] = useState({
         employeeCode: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
         departmentID: '',
@@ -83,13 +84,28 @@ const HireModal = ({ applicant, onClose, onHired }) => {
                 })
             });
             if (res.ok) {
-                alert('Employee Hired Successfully! Credentials sent via email.');
+                setPopup({
+                    type: 'success',
+                    title: 'Employee Hired!',
+                    message: 'Employee hired successfully! Portal welcome credentials sent via email.'
+                });
                 onHired();
             } else {
                 const data = await res.json();
                 setErrors(prev => ({ ...prev, server: data.message || 'Hiring failed' }));
+                setPopup({
+                    type: 'error',
+                    title: 'Hiring Failed',
+                    message: data.message || 'Failed to complete hiring operation.'
+                });
             }
-        } catch (err) { alert('Hiring failed'); }
+        } catch (err) { 
+            setPopup({
+                type: 'error',
+                title: 'Hiring Error',
+                message: 'A network error occurred while processing hiring enrollment.'
+            });
+        }
         finally { setLoading(false); }
     };
 
@@ -302,6 +318,7 @@ const Recruitment = () => {
     const [interviewForm, setInterviewForm] = useState({ interviewDate: '', feedback: '' });
     const [scoreForm, setScoreForm] = useState({ interviewScore: '', feedback: '' });
     const [activeView, setActiveView] = useState('pipeline'); // 'pipeline' | 'interviews'
+    const [popup, setPopup] = useState(null);
 
     const fetchApplicants = async () => {
         try {
@@ -337,9 +354,29 @@ const Recruitment = () => {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                 body: JSON.stringify({ applicantID: interviewTarget.ApplicantID, ...interviewForm })
             });
-            if (res.ok) { setShowInterviewModal(false); fetchInterviews(); alert('Interview scheduled!'); }
-            else { const d = await res.json(); alert(d.message); }
-        } catch (err) { alert('Failed'); }
+            if (res.ok) { 
+                setShowInterviewModal(false); 
+                fetchInterviews(); 
+                setPopup({
+                    type: 'success',
+                    title: 'Interview Scheduled!',
+                    message: 'The interview has been successfully scheduled.'
+                }); 
+            } else { 
+                const d = await res.json(); 
+                setPopup({
+                    type: 'error',
+                    title: 'Scheduling Failed',
+                    message: d.message || 'Could not schedule the interview.'
+                }); 
+            }
+        } catch (err) { 
+            setPopup({
+                type: 'error',
+                title: 'Network Error',
+                message: 'Failed to connect to backend to schedule interview.'
+            }); 
+        }
     };
 
     const handleRecordScore = async (e, interviewID) => {
@@ -350,9 +387,29 @@ const Recruitment = () => {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                 body: JSON.stringify(scoreForm)
             });
-            if (res.ok) { setScoreTarget(null); fetchInterviews(); }
-            else { const d = await res.json(); alert(d.message); }
-        } catch (err) { alert('Failed'); }
+            if (res.ok) { 
+                setScoreTarget(null); 
+                fetchInterviews(); 
+                setPopup({
+                    type: 'success',
+                    title: 'Score Recorded!',
+                    message: 'The interview score and feedback have been logged successfully.'
+                });
+            } else { 
+                const d = await res.json(); 
+                setPopup({
+                    type: 'error',
+                    title: 'Recording Failed',
+                    message: d.message || 'Could not save the interview score.'
+                }); 
+            }
+        } catch (err) { 
+            setPopup({
+                type: 'error',
+                title: 'Network Error',
+                message: 'Failed to record the interview score.'
+            }); 
+        }
     };
 
     const handleReject = async (id) => {
@@ -377,6 +434,7 @@ const Recruitment = () => {
                     applicant={selectedApplicant} 
                     onClose={() => setSelectedApplicant(null)} 
                     onHired={() => { setSelectedApplicant(null); fetchApplicants(); }} 
+                    setPopup={setPopup}
                 />
             )}
             {showInterviewModal && interviewTarget && (
@@ -489,6 +547,7 @@ const Recruitment = () => {
                     ))}
                 </div>
             )}
+            {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
         </div>
     );
 };
