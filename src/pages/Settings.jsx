@@ -136,7 +136,7 @@ const Settings = () => {
 
             {/* Branches — card grid */}
             {activeTab === 'branches' ? (
-                <div style={{ maxHeight: '520px', overflowY: 'auto', paddingRight: '8px' }}>
+                <div className="custom-scroll" style={{ maxHeight: '520px', paddingRight: '8px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
                         {data.map((item, idx) => (
                             <div key={idx} className="card glass" style={{ position: 'relative', overflow: 'hidden' }}>
@@ -184,7 +184,7 @@ const Settings = () => {
                     />
                 </div>
             ) : activeTab === 'shifts' ? (
-                <div style={{ maxHeight: '520px', overflowY: 'auto', paddingRight: '8px' }}>
+                <div className="custom-scroll" style={{ maxHeight: '520px', paddingRight: '8px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' }}>
                         {data.map((item, idx) => (
                             <div key={idx} className="card glass" style={{ position: 'relative' }}>

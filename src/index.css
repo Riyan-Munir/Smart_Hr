@@ -54,6 +54,21 @@ select.form-input option {
     scrollbar-width: none;
 }
 
+.custom-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.custom-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -206,6 +221,7 @@ select.form-input option {
   border-radius: 20px;
   padding: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
