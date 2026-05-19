@@ -136,41 +136,42 @@ const Settings = () => {
 
             {/* Branches — card grid */}
             {activeTab === 'branches' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                    {data.map((item, idx) => (
-                        <div key={idx} className="card glass" style={{ position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ position: 'absolute', top: 0, right: 0, padding: '12px' }}>
-                                <button className="btn glass" style={{ color: 'var(--error)', padding: '6px' }} onClick={() => handleDelete(item.BranchID, 'BranchID')}><Trash2 size={14} /></button>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '1.5rem' }}>
-                                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--primary-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
-                                    <Building2 size={24} />
+                <div style={{ maxHeight: '520px', overflowY: 'auto', paddingRight: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                        {data.map((item, idx) => (
+                            <div key={idx} className="card glass" style={{ position: 'relative', overflow: 'hidden' }}>
+                                <div style={{ position: 'absolute', top: 0, right: 0, padding: '12px' }}>
+                                    <button className="btn glass" style={{ color: 'var(--error)', padding: '6px' }} onClick={() => handleDelete(item.BranchID, 'BranchID')}><Trash2 size={14} /></button>
                                 </div>
-                                <div>
-                                    <h4 style={{ fontWeight: '700' }}>{item.BranchName}</h4>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>ID: #{item.BranchID}</p>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {[['City', item.City], ['Country', item.Country]].map(([k, v]) => (
-                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                        <span style={{ color: 'var(--text-dim)' }}>{k}</span>
-                                        <span style={{ fontWeight: '600' }}>{v}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '1.5rem' }}>
+                                    <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--primary-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                                        <Building2 size={24} />
                                     </div>
-                                ))}
+                                    <div>
+                                        <h4 style={{ fontWeight: '700' }}>{item.BranchName}</h4>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>ID: #{item.BranchID}</p>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {[['City', item.City], ['Country', item.Country]].map(([k, v]) => (
+                                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                            <span style={{ color: 'var(--text-dim)' }}>{k}</span>
+                                            <span style={{ fontWeight: '600' }}>{v}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             ) : activeTab === 'taxslabs' ? (
                 /* Tax Slabs — special read-friendly layout */
-                <div className="card glass" style={{ overflow: 'hidden' }}>
+                <div className="card glass" style={{ height: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <div style={{ marginBottom: '1rem', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
                         These brackets drive <code>dbo.fn_CalculateTax()</code> used in payroll generation.
                     </div>
                     <DataTable
-                        containerStyle={{ height: 'auto' }}
-                        tableContainerStyle={{ overflow: 'hidden', height: 'auto', background: 'transparent', border: 'none' }}
+                        tableContainerStyle={{ background: 'transparent', border: 'none' }}
                         headers={['Slab', 'Min Salary (PKR)', 'Max Salary (PKR)', 'Tax Rate', 'Action']}
                         data={data} loading={loading}
                         renderRow={(item, idx) => (<>
@@ -183,37 +184,38 @@ const Settings = () => {
                     />
                 </div>
             ) : activeTab === 'shifts' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' }}>
-                    {data.map((item, idx) => (
-                        <div key={idx} className="card glass" style={{ position: 'relative' }}>
-                            <div style={{ position: 'absolute', top: 0, right: 0, padding: '12px' }}>
-                                <button className="btn glass" style={{ color: 'var(--error)', padding: '6px' }} onClick={() => handleDelete(item.ShiftID, 'ShiftID')}><Trash2 size={14} /></button>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '1rem' }}>
-                                <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Clock size={22} color="var(--accent)" />
+                <div style={{ maxHeight: '520px', overflowY: 'auto', paddingRight: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' }}>
+                        {data.map((item, idx) => (
+                            <div key={idx} className="card glass" style={{ position: 'relative' }}>
+                                <div style={{ position: 'absolute', top: 0, right: 0, padding: '12px' }}>
+                                    <button className="btn glass" style={{ color: 'var(--error)', padding: '6px' }} onClick={() => handleDelete(item.ShiftID, 'ShiftID')}><Trash2 size={14} /></button>
                                 </div>
-                                <h4 style={{ fontWeight: '700' }}>{item.ShiftName}</h4>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                <div style={{ textAlign: 'center', flex: 1 }}>
-                                    <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Start</p>
-                                    <p style={{ fontWeight: '700', color: 'var(--primary)', marginTop: '4px' }}>{formatTime(item.StartTime)}</p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '1rem' }}>
+                                    <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Clock size={22} color="var(--accent)" />
+                                    </div>
+                                    <h4 style={{ fontWeight: '700' }}>{item.ShiftName}</h4>
                                 </div>
-                                <div style={{ width: '1px', background: 'var(--border)' }} />
-                                <div style={{ textAlign: 'center', flex: 1 }}>
-                                    <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>End</p>
-                                    <p style={{ fontWeight: '700', color: 'var(--primary)', marginTop: '4px' }}>{formatTime(item.EndTime)}</p>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                    <div style={{ textAlign: 'center', flex: 1 }}>
+                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Start</p>
+                                        <p style={{ fontWeight: '700', color: 'var(--primary)', marginTop: '4px' }}>{formatTime(item.StartTime)}</p>
+                                    </div>
+                                    <div style={{ width: '1px', background: 'var(--border)' }} />
+                                    <div style={{ textAlign: 'center', flex: 1 }}>
+                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>End</p>
+                                        <p style={{ fontWeight: '700', color: 'var(--primary)', marginTop: '4px' }}>{formatTime(item.EndTime)}</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             ) : activeTab === 'kpis' ? (
-                <div className="card glass" style={{ overflow: 'hidden' }}>
+                <div className="card glass" style={{ height: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <DataTable
-                        containerStyle={{ height: 'auto' }}
-                        tableContainerStyle={{ overflow: 'hidden', height: 'auto', background: 'transparent', border: 'none' }}
+                        tableContainerStyle={{ background: 'transparent', border: 'none' }}
                         headers={['KPI Name', 'Weight', 'Action']}
                         data={data} loading={loading}
                         renderRow={item => (<>
@@ -232,10 +234,9 @@ const Settings = () => {
                 </div>
             ) : (
                 /* Departments & Designations */
-                <div className="card glass" style={{ overflow: 'hidden' }}>
+                <div className="card glass" style={{ height: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <DataTable
-                        containerStyle={{ height: 'auto' }}
-                        tableContainerStyle={{ overflow: 'hidden', height: 'auto', background: 'transparent', border: 'none' }}
+                        tableContainerStyle={{ background: 'transparent', border: 'none' }}
                         headers={activeTab === 'departments' ? ['Department Name', 'Created', 'Action'] : ['Designation', 'Base Salary', 'Action']}
                         data={data} loading={loading}
                         renderRow={item => activeTab === 'departments' ? (<>

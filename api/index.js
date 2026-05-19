@@ -1227,7 +1227,77 @@ app.post('/api/interviews', authenticateToken, async (req, res) => {
             .input('Date', sql.DateTime, new Date(interviewDate))
             .input('Feedback', sql.NVarChar, feedback || '')
             .query('INSERT INTO Interviews (ApplicantID, InterviewDate, Feedback) VALUES (@AppID, @Date, @Feedback)');
-        res.json({ message: 'Interview scheduled' });
+
+        let emailSent = true;
+        try {
+            const applicantRes = await pool.request()
+                .input('AppID', sql.Int, applicantID)
+                .query('SELECT FirstName, LastName, Email, AppliedPosition FROM Applicants WHERE ApplicantID = @AppID');
+            
+            const applicant = applicantRes.recordset[0];
+            if (applicant && applicant.Email) {
+                const formattedDate = new Date(interviewDate).toLocaleString('en-US', {
+                    dateStyle: 'full',
+                    timeStyle: 'short'
+                });
+                
+                const htmlContent = `
+<div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #0c0f1d; color: #f9fafb; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 25px;">
+        <h2 style="color: #6366f1; margin: 0; font-size: 1.8rem; font-weight: 700; letter-spacing: 1px;">SmartHR+</h2>
+        <p style="color: #8b5cf6; margin: 5px 0 0 0; font-size: 0.9rem; text-transform: uppercase; font-weight: 600; letter-spacing: 2px;">Interview Invitation</p>
+    </div>
+    
+    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; line-height: 1.6;">
+        <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 15px;">Dear ${applicant.FirstName} ${applicant.LastName},</p>
+        <p style="color: #9ca3af; margin-bottom: 20px;">Thank you for applying for the position of <strong style="color: #f9fafb;">${applicant.AppliedPosition}</strong> at SmartHR+. We are impressed with your qualifications and would love to invite you for an interview.</p>
+        
+        <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+            <h3 style="color: #6366f1; margin-top: 0; margin-bottom: 12px; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px;">Interview Details</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+                <tr>
+                    <td style="color: #9ca3af; padding: 6px 0; width: 35%; font-weight: 500;">Position:</td>
+                    <td style="color: #f9fafb; padding: 6px 0; font-weight: 600;">${applicant.AppliedPosition}</td>
+                </tr>
+                <tr>
+                    <td style="color: #9ca3af; padding: 6px 0; font-weight: 500;">Date & Time:</td>
+                    <td style="color: #ec4899; padding: 6px 0; font-weight: 600;">${formattedDate}</td>
+                </tr>
+                ${feedback ? `
+                <tr>
+                    <td style="color: #9ca3af; padding: 6px 0; vertical-align: top; font-weight: 500;">Admin Notes:</td>
+                    <td style="color: #f9fafb; padding: 6px 0; font-style: italic;">"${feedback}"</td>
+                </tr>` : ''}
+            </table>
+        </div>
+        
+        <p style="color: #9ca3af; margin-bottom: 25px;">Our recruitment team will contact you shortly with link details or venue instructions. If you have any questions or need to reschedule, please reply directly to this email.</p>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="mailto:${process.env.SMTP_USER}" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 10px; font-weight: 600; font-size: 0.95rem; display: inline-block; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);">Confirm Attendance</a>
+        </div>
+    </div>
+    
+    <div style="margin-top: 35px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; text-align: center; font-size: 0.75rem; color: #6b7280;">
+        <p style="margin: 0 0 5px 0;">This is an automated notification from SmartHR+ Recruitment Lifecycle.</p>
+        <p style="margin: 0;">© ${new Date().getFullYear()} SmartHR+. All rights reserved.</p>
+    </div>
+</div>
+`;
+
+                await transporter.sendMail({
+                    from: `"SmartHR+ Recruitment" <${process.env.SMTP_USER}>`,
+                    to: applicant.Email,
+                    subject: `Interview scheduled: ${applicant.AppliedPosition} - SmartHR+`,
+                    html: htmlContent
+                });
+            }
+        } catch (emailErr) {
+            console.error('❌ Failed to send SMTP interview scheduled email:', emailErr);
+            emailSent = false;
+        }
+
+        res.json({ message: emailSent ? 'Interview scheduled and email notification sent.' : 'Interview scheduled (email notification failed).' });
     } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
